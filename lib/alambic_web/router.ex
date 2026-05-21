@@ -18,6 +18,7 @@ defmodule AlambicWeb.Router do
     pipe_through :browser
 
     get "/", PageController, :home
+    live "/queue", QueueLive, :index
   end
 
   scope "/api", AlambicWeb do

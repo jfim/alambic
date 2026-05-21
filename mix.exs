@@ -66,7 +66,8 @@ defmodule Alambic.MixProject do
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:req, "~> 0.5"},
       {:mox, "~> 1.1", only: :test},
-      {:bypass, "~> 2.1", only: :test}
+      {:bypass, "~> 2.1", only: :test},
+      {:lazy_html, ">= 0.1.0", only: :test}
     ]
   end
 
