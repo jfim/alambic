@@ -29,6 +29,7 @@ defmodule AlambicWeb.QueueLiveTest do
     {:ok, _view, html} = live(conn, ~p"/queue")
     assert html =~ "/edit-cleaning/b"
     assert html =~ "/edit-extraction/a"
+
     assert :binary.match(html, "/edit-cleaning/b") |> elem(0) <
              :binary.match(html, "/edit-extraction/a") |> elem(0)
   end

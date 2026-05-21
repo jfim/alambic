@@ -15,6 +15,7 @@ defmodule Alambic.Repo.Migrations.CreateModels do
 
     create unique_index(:models, [:stage],
              where: "status = 'active'",
-             name: :one_active_model_per_stage)
+             name: :one_active_model_per_stage
+           )
   end
 end

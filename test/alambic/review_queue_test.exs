@@ -17,7 +17,12 @@ defmodule Alambic.ReviewQueueTest do
   test "list_pending/0 orders by ascending confidence" do
     for {id, c} <- [{"a", 0.9}, {"b", 0.1}, {"c", 0.5}] do
       {:ok, _} =
-        ReviewQueue.enqueue(%{item_id: id, stage: :extraction, confidence: c, model_version: "v1"})
+        ReviewQueue.enqueue(%{
+          item_id: id,
+          stage: :extraction,
+          confidence: c,
+          model_version: "v1"
+        })
     end
 
     assert ["b", "c", "a"] = Enum.map(ReviewQueue.list_pending(), & &1.item_id)

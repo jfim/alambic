@@ -6,7 +6,9 @@ defmodule Alambic.ScriptRunnerTest do
   @fixture_path "test/support/fixtures/echo.py"
 
   test "run_sync/3 returns stdout and exit code for a successful script" do
-    assert {:ok, output, 0} = ScriptRunner.run_sync("uv", ["run", @fixture_path, "hello"], timeout: 60_000)
+    assert {:ok, output, 0} =
+             ScriptRunner.run_sync("uv", ["run", @fixture_path, "hello"], timeout: 60_000)
+
     assert %{"echoed" => "hello"} = Jason.decode!(String.trim(output))
   end
 

@@ -42,20 +42,25 @@ RUN --mount=type=cache,target=/root/.hex \
 # --- Runtime ---
 FROM debian:trixie-slim
 
-RUN apt-get update && apt-get install -y libstdc++6 openssl libncurses6 locales curl \
+RUN apt-get update && apt-get install -y libstdc++6 openssl libncurses6 locales curl ca-certificates \
     && rm -rf /var/lib/apt/lists/* \
     && sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && locale-gen
 
 ENV LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
 
+# Install uv (single static binary)
+RUN curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh
+
 WORKDIR /app
 
 COPY --from=build /app/_build/prod/rel/alambic ./
+COPY scripts ./scripts
 
 COPY entrypoint.sh ./
 RUN chmod +x entrypoint.sh
 
-ENV PORT=4000
+ENV PORT=4000 \
+    UV_CACHE_DIR=/root/.cache/uv
 EXPOSE 4000
 
 ENTRYPOINT ["./entrypoint.sh"]

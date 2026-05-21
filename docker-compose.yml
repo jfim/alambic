@@ -21,6 +21,7 @@ services:
       - "${PORT:-4000}:4000"
     volumes:
       - model_artifacts:/data/models
+      - uv_cache:/root/.cache/uv
     depends_on:
       postgres:
         condition: service_healthy
@@ -31,8 +32,10 @@ services:
       ARCHIVE_BASE_URL: ${ARCHIVE_BASE_URL:?Set ARCHIVE_BASE_URL}
       MODEL_ARTIFACTS_PATH: /data/models
       REVIEW_CONFIDENCE_THRESHOLD: ${REVIEW_CONFIDENCE_THRESHOLD:-0.7}
+      CHAM_RAW_HTML_FILENAME: ${CHAM_RAW_HTML_FILENAME:-original.html}
       PORT: "4000"
 
 volumes:
   pgdata:
   model_artifacts:
+  uv_cache:

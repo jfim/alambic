@@ -55,3 +55,7 @@ release:
 # Build the Docker image
 docker-build:
     docker build -t alambic:latest .
+
+# Seed dummy models so /api/extract and /api/clean aren't 503 on a fresh DB
+db-seed:
+    mix run priv/repo/seeds.exs

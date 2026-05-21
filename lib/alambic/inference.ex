@@ -58,7 +58,11 @@ defmodule Alambic.Inference do
                ) do
             {:ok, output, 0} ->
               payload = output |> String.trim() |> Jason.decode!()
-              response = decoder.(payload) |> Map.merge(%{item_id: item_id, source: :model, model_version: version})
+
+              response =
+                decoder.(payload)
+                |> Map.merge(%{item_id: item_id, source: :model, model_version: version})
+
               maybe_enqueue(stage, item_id, response, version)
               {:ok, response}
 
