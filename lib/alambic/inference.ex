@@ -29,11 +29,14 @@ defmodule Alambic.Inference do
 
   def clean(item_id, text) do
     case Cleanings.get(item_id) do
-      %{source_text: source_text} ->
+      %{content_sha256: sha, discard_ranges: ranges} ->
+        {:ok, source} = Alambic.BlobStore.get(sha)
+        cleaned = Cleanings.apply_discard_ranges(source, ranges)
+
         {:ok,
          %{
            item_id: item_id,
-           cleaned_text: source_text,
+           cleaned_text: cleaned,
            source: :saved,
            model_version: nil,
            confidence: nil

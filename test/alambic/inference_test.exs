@@ -1,11 +1,26 @@
 defmodule Alambic.InferenceTest do
-  use Alambic.DataCase, async: true
+  use Alambic.DataCase, async: false
 
+  alias Alambic.Cleanings
   alias Alambic.Extractions
   alias Alambic.Inference
   alias Alambic.Models.Model
   alias Alambic.ReviewQueue
   alias Alambic.Repo
+
+  setup do
+    dir = Path.join(System.tmp_dir!(), "alambic_blobs_#{System.unique_integer([:positive])}")
+    File.mkdir_p!(dir)
+    prev = Application.get_env(:alambic, :blob_storage_path)
+    Application.put_env(:alambic, :blob_storage_path, dir)
+
+    on_exit(fn ->
+      File.rm_rf!(dir)
+      Application.put_env(:alambic, :blob_storage_path, prev)
+    end)
+
+    :ok
+  end
 
   defp seed_active_model(stage, version, path) do
     {:ok, m} =
@@ -24,7 +39,7 @@ defmodule Alambic.InferenceTest do
   end
 
   test "extract/2 returns saved row when present" do
-    {:ok, _} = Extractions.save(%{item_id: "x", xpath: "/saved", html_snapshot: "<h/>"})
+    {:ok, _} = Extractions.save_with_html(%{item_id: "x", xpath: "/saved"}, "<h/>")
 
     assert {:ok,
             %{
@@ -63,14 +78,18 @@ defmodule Alambic.InferenceTest do
     Application.put_env(:alambic, :review_confidence_threshold, 0.7)
   end
 
-  test "clean/2 returns saved row when present" do
+  test "clean/2 returns kept text after discarding ranges" do
     {:ok, _} =
-      Alambic.Cleanings.save(%{
-        item_id: "x",
-        token_labels: [%{"token" => "hi", "label" => "keep"}],
-        source_text: "hi"
-      })
+      Cleanings.save_with_text(
+        %{item_id: "x1", discard_ranges: [[0, 8]]},
+        "drop me keep me"
+      )
 
+    assert {:ok, %{cleaned_text: "keep me", source: :saved}} = Inference.clean("x1", "ignored")
+  end
+
+  test "clean/2 returns full source when no ranges" do
+    {:ok, _} = Cleanings.save_with_text(%{item_id: "x", discard_ranges: []}, "hi")
     assert {:ok, %{item_id: "x", source: :saved, cleaned_text: "hi"}} = Inference.clean("x", "hi")
   end
 

@@ -29,11 +29,10 @@ defmodule AlambicWeb.EditExtractionLive do
 
   def handle_event("confirm", _params, socket) do
     {:ok, _} =
-      Extractions.save(%{
-        item_id: socket.assigns.item_id,
-        xpath: @placeholder_xpath,
-        html_snapshot: socket.assigns.raw_html || ""
-      })
+      Extractions.save_with_html(
+        %{item_id: socket.assigns.item_id, xpath: @placeholder_xpath},
+        socket.assigns.raw_html || ""
+      )
 
     :ok = ReviewQueue.resolve(socket.assigns.item_id, :extraction)
     {:noreply, put_flash(socket, :info, "Extraction confirmed.")}
