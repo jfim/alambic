@@ -24,13 +24,6 @@ defmodule Alambic.ScriptRunner do
     end
   end
 
-  def run_script_sync(script_dir, args, opts) do
-    scripts_path = Keyword.get(opts, :scripts_path, Application.get_env(:alambic, :scripts_path))
-    clean_opts = Keyword.drop(opts, [:scripts_path])
-    script_path = Path.join([scripts_path, script_dir, "main.py"])
-    run_sync("uv", ["run", script_path | args], clean_opts)
-  end
-
   defp collect_output(port, timeout, acc) do
     receive do
       {^port, {:data, data}} ->
