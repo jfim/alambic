@@ -128,8 +128,21 @@ with a Floki-based pass that:
 - Drops `script`, `style`, `iframe`, `object`, `embed`, `noscript`, and
   `link` elements entirely.
 - Strips any attribute whose name starts with `on` (event handlers).
-- Strips `src` and `srcset` from `<img>` elements to prevent any remote
-  fetch — the picker UI only cares about element structure for now.
+- Drops `srcset` from `<img>` elements (multi-URL complication; we only
+  rewrite the single `src`).
+- **Rewrites `<img src>` to the matching Cham-archived asset.** Cham's
+  image-download plugin stores each fetched image under
+  `img_<md5(original_url)><ext>`, where `ext` is derived from the URL's
+  last path segment (lowercased, kept only when 2–6 chars; otherwise
+  dropped). The sanitizer reproduces that filename and rewrites `src`
+  to `{cham_base_url}/api/v1/items/{item_id}/files/img_<md5>.<ext>`.
+  If no usable extension is present in the URL, `src` is dropped
+  (the image isn't archived under a name we can construct).
+
+The sanitizer takes `item_id` as a second argument so it can build the
+per-item asset URLs. Rendering through the Cham archive instead of the
+original remote URL means correction reviewers see what Cham has
+preserved, which is the data the model will eventually train on.
 
 This is intentionally conservative for the placeholder. A real DOM
 picker will later need to keep some attribute information (`id`,

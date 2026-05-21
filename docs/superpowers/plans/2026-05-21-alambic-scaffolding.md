@@ -1940,7 +1940,7 @@ defmodule Alambic.HtmlSanitizerTest do
     <link rel="stylesheet" href="x" />
     """
 
-    out = HtmlSanitizer.sanitize(input)
+    out = HtmlSanitizer.sanitize(input, "item-1")
     assert out =~ "<p>keep</p>"
     refute out =~ "alert"
     refute out =~ "<script"
@@ -1953,24 +1953,35 @@ defmodule Alambic.HtmlSanitizerTest do
   end
 
   test "strips on* event handler attributes" do
-    out = HtmlSanitizer.sanitize(~s(<a href="/x" onclick="boom()">go</a>))
+    out = HtmlSanitizer.sanitize(~s(<a href="/x" onclick="boom()">go</a>), "item-1")
     assert out =~ ~s(href="/x")
     refute out =~ "onclick"
   end
 
-  test "strips src and srcset from img elements" do
+  test "rewrites img src to the cham-archived asset URL" do
+    Application.put_env(:alambic, :cham_base_url, "http://cham.test")
+    url = "https://example.com/photo.jpg"
+    md5 = :crypto.hash(:md5, url) |> Base.encode16(case: :lower)
+
     out =
       HtmlSanitizer.sanitize(
-        ~s(<img src="https://evil/x.png" srcset="https://evil/2x.png 2x" alt="a">)
+        ~s(<img src="#{url}" srcset="#{url} 2x" alt="a">),
+        "item-1"
       )
 
+    assert out =~ ~s|src="http://cham.test/api/v1/items/item-1/files/img_#{md5}.jpg"|
+    refute out =~ "srcset"
+    assert out =~ ~s(alt="a")
+  end
+
+  test "drops img src when the URL has no usable extension" do
+    out = HtmlSanitizer.sanitize(~s(<img src="https://example.com/photo" alt="a">), "item-1")
     refute out =~ "src="
-    refute out =~ "srcset="
     assert out =~ ~s(alt="a")
   end
 
   test "returns empty string on unparseable input" do
-    assert HtmlSanitizer.sanitize(:not_a_string) == ""
+    assert HtmlSanitizer.sanitize(:not_a_string, "item-1") == ""
   end
 end
 ```
@@ -1990,40 +2001,89 @@ Create `lib/alambic/html_sanitizer.ex`:
 ```elixir
 defmodule Alambic.HtmlSanitizer do
   @moduledoc """
-  Strips dangerous and remote-loading content from HTML before display.
+  Strips dangerous content from HTML before display and rewrites `<img>`
+  sources to point at Cham's archived copy of each image.
 
   Drops scripts, styles, frames, and other interactive/embedded content
-  entirely. Removes event-handler attributes (`on*`) and image source
-  attributes (`src`, `srcset`) — the placeholder picker UI only needs
-  structure, not loaded subresources.
+  entirely. Removes event-handler attributes (`on*`). For images, drops
+  `srcset` and rewrites `src` to the Cham archive URL, mirroring Cham's
+  download_images plugin filename scheme: `img_<md5(url)><ext>` where
+  `ext` is the lowercased extension from the URL's last path segment
+  (kept only when 2–6 chars including the dot). If no usable extension
+  is present, the src is dropped.
   """
 
   @drop_tags ~w(script style iframe object embed noscript link)
-  @img_blocked_attrs ~w(src srcset)
 
-  def sanitize(html) when is_binary(html) do
+  @spec sanitize(binary, String.t()) :: String.t()
+  def sanitize(html, item_id) when is_binary(html) and is_binary(item_id) do
     case Floki.parse_document(html) do
-      {:ok, tree} -> tree |> walk() |> Floki.raw_html()
+      {:ok, tree} -> tree |> walk(item_id) |> Floki.raw_html()
       {:error, _} -> ""
     end
   end
 
-  def sanitize(_), do: ""
+  def sanitize(_, _), do: ""
 
-  defp walk(nodes) when is_list(nodes), do: Enum.flat_map(nodes, &walk_node/1)
+  defp walk(nodes, item_id) when is_list(nodes),
+    do: Enum.flat_map(nodes, &walk_node(&1, item_id))
 
-  defp walk_node({tag, _attrs, _children}) when tag in @drop_tags, do: []
+  defp walk_node({tag, _attrs, _children}, _item_id) when tag in @drop_tags, do: []
 
-  defp walk_node({"img", attrs, children}) do
-    cleaned = attrs |> Enum.reject(fn {k, _} -> k in @img_blocked_attrs end) |> strip_event_attrs()
-    [{"img", cleaned, walk(children)}]
+  defp walk_node({"img", attrs, children}, item_id) do
+    rewritten =
+      attrs
+      |> Enum.reject(fn {k, _} -> k == "srcset" end)
+      |> strip_event_attrs()
+      |> rewrite_img_src(item_id)
+
+    [{"img", rewritten, walk(children, item_id)}]
   end
 
-  defp walk_node({tag, attrs, children}) when is_binary(tag) do
-    [{tag, strip_event_attrs(attrs), walk(children)}]
+  defp walk_node({tag, attrs, children}, item_id) when is_binary(tag) do
+    [{tag, strip_event_attrs(attrs), walk(children, item_id)}]
   end
 
-  defp walk_node(other), do: [other]
+  defp walk_node(other, _item_id), do: [other]
+
+  defp rewrite_img_src(attrs, item_id) do
+    case List.keyfind(attrs, "src", 0) do
+      {"src", url} ->
+        case cham_asset_url(url, item_id) do
+          {:ok, new_url} -> List.keyreplace(attrs, "src", 0, {"src", new_url})
+          :error -> List.keydelete(attrs, "src", 0)
+        end
+
+      nil ->
+        attrs
+    end
+  end
+
+  defp cham_asset_url(url, item_id) do
+    with {:ok, ext} <- extension_for(url) do
+      md5 = :crypto.hash(:md5, url) |> Base.encode16(case: :lower)
+      base = Application.fetch_env!(:alambic, :cham_base_url)
+      {:ok, "#{base}/api/v1/items/#{URI.encode(item_id)}/files/img_#{md5}#{ext}"}
+    end
+  end
+
+  defp extension_for(url) do
+    last_segment = url |> URI.parse() |> Map.get(:path, "") |> Path.basename()
+
+    case String.split(last_segment, ".") do
+      [_ | _] = parts when length(parts) >= 2 ->
+        ext = "." <> (parts |> List.last() |> String.downcase())
+
+        if String.length(ext) in 2..6 and Regex.match?(~r/^\.[a-z0-9]+$/, ext) do
+          {:ok, ext}
+        else
+          :error
+        end
+
+      _ ->
+        :error
+    end
+  end
 
   defp strip_event_attrs(attrs) do
     Enum.reject(attrs, fn {k, _v} -> String.starts_with?(k, "on") end)
@@ -2172,7 +2232,7 @@ defmodule AlambicWeb.EditExtractionLive do
          assign(socket,
            item_id: item_id,
            raw_html: raw_html,
-           safe_html: HtmlSanitizer.sanitize(raw_html),
+           safe_html: HtmlSanitizer.sanitize(raw_html, item_id),
            error: nil
          )}
 
@@ -2246,7 +2306,7 @@ defmodule AlambicWeb.EditCleaningLive do
          assign(socket,
            item_id: item_id,
            raw_html: raw_html,
-           safe_html: HtmlSanitizer.sanitize(raw_html),
+           safe_html: HtmlSanitizer.sanitize(raw_html, item_id),
            error: nil
          )}
 
