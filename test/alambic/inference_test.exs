@@ -5,8 +5,8 @@ defmodule Alambic.InferenceTest do
   alias Alambic.Extractions
   alias Alambic.Inference
   alias Alambic.Models.Model
-  alias Alambic.ReviewQueue
   alias Alambic.Repo
+  alias Alambic.ReviewQueue
 
   setup do
     dir = Path.join(System.tmp_dir!(), "alambic_blobs_#{System.unique_integer([:positive])}")
