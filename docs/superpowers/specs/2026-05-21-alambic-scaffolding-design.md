@@ -112,13 +112,29 @@ Read-only HTTP client behind a behaviour, against `CHAM_BASE_URL`. Single call s
 @callback fetch_html(item_id :: String.t()) :: {:ok, binary} | {:error, term}
 ```
 
-**Open question — pending user input:** which Cham file path does this hit? Cham exposes `GET /api/v1/items/:id/files/*filename` (multiple files per item). Options not yet chosen:
+**Filename convention:** confirmed as `original.html` (e.g.
+`https://cham.jfim.dev/api/v1/items/<uuid>/files/original.html`). The
+alambic config exposes `CHAM_RAW_HTML_FILENAME` (default `original.html`)
+so the convention can be overridden without code changes when Cham's
+output naming evolves.
 
-1. Convention (e.g. `raw.html` or `original.html`) hard-coded in alambic.
-2. Filename stored alongside `item_id` somewhere in alambic.
-3. New Cham endpoint that returns "the raw HTML artifact" for an item.
+### HTML sanitization
 
-This blocks correction-UI fetch behavior. Until resolved, the client is wired but the LiveViews can degrade to "could not fetch HTML" with a visible reason — sufficient for spec walkthrough.
+Cham serves the raw original HTML, which can contain scripts, remote
+image loads, tracking pixels, and other interactive content. Before
+rendering in the correction LiveViews, alambic sanitizes the document
+with a Floki-based pass that:
+
+- Drops `script`, `style`, `iframe`, `object`, `embed`, `noscript`, and
+  `link` elements entirely.
+- Strips any attribute whose name starts with `on` (event handlers).
+- Strips `src` and `srcset` from `<img>` elements to prevent any remote
+  fetch — the picker UI only cares about element structure for now.
+
+This is intentionally conservative for the placeholder. A real DOM
+picker will later need to keep some attribute information (`id`,
+`class`, `data-*`); those are preserved today since the sanitizer only
+removes the dangerous set.
 
 ## Deployment changes from current scaffold
 
@@ -129,9 +145,8 @@ This blocks correction-UI fetch behavior. Until resolved, the client is wired bu
 ## Open spec issues this surfaces
 
 1. **HTML/text storage** — DB now, blob store later. Decision blocked on training-pipeline design.
-2. **Cham raw-HTML filename convention** — see above; user investigating.
-3. **Authentication** — nothing in either system today; revisit before going past localhost.
-4. **Queue resolution lifecycle** — spec says "Confirming a correction in either UI marks the entry resolved." Implemented locally. The unresolved spec question is whether the *archive plugin* (or anyone else) needs to be notified — for now the answer is "no, alambic-internal only", consistent with the no-reprocess decision.
+2. **Authentication** — nothing in either system today; revisit before going past localhost.
+3. **Queue resolution lifecycle** — spec says "Confirming a correction in either UI marks the entry resolved." Implemented locally. The unresolved spec question is whether the *archive plugin* (or anyone else) needs to be notified — for now the answer is "no, alambic-internal only", consistent with the no-reprocess decision.
 
 ## Non-goals
 
