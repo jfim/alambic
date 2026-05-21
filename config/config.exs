@@ -61,6 +61,13 @@ config :logger, :console,
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
 
+config :alambic,
+  cham_impl: Alambic.Cham.HTTP,
+  cham_base_url: "http://localhost:4001",
+  cham_raw_html_filename: "original.html",
+  review_confidence_threshold: 0.7,
+  scripts_path: "scripts"
+
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
 import_config "#{config_env()}.exs"
