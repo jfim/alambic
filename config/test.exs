@@ -37,3 +37,5 @@ config :phoenix_live_view,
   enable_expensive_runtime_checks: true
 
 config :alambic, cham_impl: Alambic.ChamMock
+
+config :alambic, :blob_storage_path, Path.expand("../tmp/blobs_test", __DIR__)

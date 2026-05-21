@@ -59,6 +59,10 @@ if config_env() == :prod do
       "REVIEW_CONFIDENCE_THRESHOLD" |> System.get_env("0.7") |> String.to_float(),
     cham_raw_html_filename: System.get_env("CHAM_RAW_HTML_FILENAME", "original.html")
 
+  config :alambic, :blob_storage_path,
+    System.get_env("BLOB_STORAGE_PATH") ||
+      raise "environment variable BLOB_STORAGE_PATH is missing."
+
   config :alambic, AlambicWeb.Endpoint,
     url: [host: host, port: 443, scheme: "https"],
     http: [
