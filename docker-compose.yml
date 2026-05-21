@@ -1,0 +1,38 @@
+services:
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: alambic
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-alambic}
+      POSTGRES_DB: alambic
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U alambic"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  alambic:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "${PORT:-4000}:4000"
+    volumes:
+      - model_artifacts:/data/models
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: ecto://alambic:${POSTGRES_PASSWORD:-alambic}@postgres/alambic
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE:?Set SECRET_KEY_BASE}
+      PHX_HOST: ${PHX_HOST:?Set PHX_HOST}
+      ARCHIVE_BASE_URL: ${ARCHIVE_BASE_URL:?Set ARCHIVE_BASE_URL}
+      MODEL_ARTIFACTS_PATH: /data/models
+      REVIEW_CONFIDENCE_THRESHOLD: ${REVIEW_CONFIDENCE_THRESHOLD:-0.7}
+      PORT: "4000"
+
+volumes:
+  pgdata:
+  model_artifacts:
