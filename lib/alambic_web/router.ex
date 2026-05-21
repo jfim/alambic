@@ -29,6 +29,9 @@ defmodule AlambicWeb.Router do
     post "/extract", ExtractController, :create
     post "/clean", CleanController, :create
 
+    get "/datasets/:stage/rows.parquet", DatasetController, :rows
+    get "/datasets/:stage/blobs/:sha256", DatasetController, :blob
+
     get "/models", Admin.ModelController, :index
     post "/models/:version/activate", Admin.ModelController, :activate
   end
