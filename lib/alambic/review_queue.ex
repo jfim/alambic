@@ -4,6 +4,8 @@ defmodule Alambic.ReviewQueue do
   alias Alambic.Repo
   alias Alambic.ReviewQueue.Entry
 
+  @valid_stages Entry.stages()
+
   def enqueue(attrs) do
     %Entry{}
     |> Entry.changeset(attrs)
@@ -13,7 +15,7 @@ defmodule Alambic.ReviewQueue do
     )
   end
 
-  def resolve(item_id, stage) when stage in [:extraction, :cleaning] do
+  def resolve(item_id, stage) when stage in @valid_stages do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
     {_, _} =

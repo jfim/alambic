@@ -607,10 +607,10 @@ defmodule Alambic.Cleanings do
   def get(item_id), do: Repo.get(Cleaning, item_id)
 
   def save(attrs) do
-    case Repo.get(Cleaning, attrs.item_id) do
-      nil -> %Cleaning{}
-      existing -> existing
-    end
+    item_id = Map.get(attrs, :item_id) || Map.get(attrs, "item_id")
+    existing = item_id && Repo.get(Cleaning, item_id)
+
+    (existing || %Cleaning{})
     |> Cleaning.changeset(attrs)
     |> Repo.insert_or_update()
   end

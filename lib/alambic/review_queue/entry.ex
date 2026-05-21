@@ -24,4 +24,6 @@ defmodule Alambic.ReviewQueue.Entry do
     |> cast(attrs, [:item_id, :stage, :confidence, :model_version, :queued_at, :resolved_at])
     |> validate_required([:item_id, :stage, :confidence, :model_version, :queued_at])
   end
+
+  def stages, do: @stages
 end
