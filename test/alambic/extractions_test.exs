@@ -1,25 +1,37 @@
 defmodule Alambic.ExtractionsTest do
-  use Alambic.DataCase, async: true
+  use Alambic.DataCase, async: false
 
-  alias Alambic.Extractions
-  alias Alambic.Extractions.Extraction
+  alias Alambic.{BlobStore, Extractions}
 
-  test "get/1 returns nil for unknown item_id" do
-    assert Extractions.get("nope") == nil
+  setup do
+    dir = Path.join(System.tmp_dir!(), "alambic_blobs_#{System.unique_integer([:positive])}")
+    File.mkdir_p!(dir)
+    prev = Application.get_env(:alambic, :blob_storage_path)
+    Application.put_env(:alambic, :blob_storage_path, dir)
+
+    on_exit(fn ->
+      File.rm_rf!(dir)
+      Application.put_env(:alambic, :blob_storage_path, prev)
+    end)
+
+    :ok
   end
 
-  test "save/1 upserts an extraction row" do
-    attrs = %{
-      item_id: "abc",
-      xpath: "/html/body/article",
-      html_snapshot: "<html>...</html>",
-      model_version: "v1"
-    }
+  test "save_with_html stores blob and persists row with its sha" do
+    {:ok, row} = Extractions.save_with_html(%{item_id: "it1", xpath: "/html"}, "<html></html>")
 
-    {:ok, %Extraction{item_id: "abc"}} = Extractions.save(attrs)
-    assert %Extraction{xpath: "/html/body/article"} = Extractions.get("abc")
+    assert row.content_sha256 ==
+             :crypto.hash(:sha256, "<html></html>") |> Base.encode16(case: :lower)
 
-    {:ok, _} = Extractions.save(%{attrs | xpath: "/html/body/main"})
-    assert %Extraction{xpath: "/html/body/main"} = Extractions.get("abc")
+    assert {:ok, "<html></html>"} = BlobStore.get(row.content_sha256)
+  end
+
+  test "delete removes row and blob" do
+    {:ok, row} =
+      Extractions.save_with_html(%{item_id: "it2", xpath: "/html"}, "<html>x</html>")
+
+    :ok = Extractions.delete("it2")
+    assert nil == Extractions.get("it2")
+    assert :not_found = BlobStore.get(row.content_sha256)
   end
 end
