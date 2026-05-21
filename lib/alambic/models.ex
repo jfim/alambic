@@ -4,9 +4,11 @@ defmodule Alambic.Models do
   alias Alambic.Models.Model
   alias Alambic.Repo
 
+  @valid_stages Model.stages()
+
   def list, do: Repo.all(from m in Model, order_by: [asc: m.stage, asc: m.version])
 
-  def active_for(stage) when stage in [:extraction, :cleaning] do
+  def active_for(stage) when stage in @valid_stages do
     Repo.one(from m in Model, where: m.stage == ^stage and m.status == :active)
   end
 
@@ -22,8 +24,10 @@ defmodule Alambic.Models do
             set: [status: :retired]
           )
 
-          {:ok, updated} = model |> Model.changeset(%{status: :active}) |> Repo.update()
-          updated
+          case model |> Model.changeset(%{status: :active}) |> Repo.update() do
+            {:ok, updated} -> updated
+            {:error, changeset} -> Repo.rollback({:changeset, changeset})
+          end
         end)
     end
   end
