@@ -25,6 +25,9 @@ defmodule AlambicWeb.Router do
 
     post "/extract", ExtractController, :create
     post "/clean", CleanController, :create
+
+    get "/models", Admin.ModelController, :index
+    post "/models/:version/activate", Admin.ModelController, :activate
   end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development
