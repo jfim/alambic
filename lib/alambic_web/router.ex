@@ -20,10 +20,12 @@ defmodule AlambicWeb.Router do
     get "/", PageController, :home
   end
 
-  # Other scopes may use custom stacks.
-  # scope "/api", AlambicWeb do
-  #   pipe_through :api
-  # end
+  scope "/api", AlambicWeb do
+    pipe_through :api
+
+    post "/extract", ExtractController, :create
+    post "/clean", CleanController, :create
+  end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development
   if Application.compile_env(:alambic, :dev_routes) do
