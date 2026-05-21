@@ -68,6 +68,8 @@ config :alambic,
   review_confidence_threshold: 0.7,
   scripts_path: "scripts"
 
+config :alambic, :blob_storage_path, "tmp/blobs"
+
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
 import_config "#{config_env()}.exs"
