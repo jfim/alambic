@@ -36,7 +36,6 @@ defmodule AlambicWeb.QueueLive do
     """
   end
 
-  # TODO Task 13: restore ~p sigils once /edit-extraction/:id and /edit-cleaning/:id routes exist
-  defp correction_path(%{stage: :extraction, item_id: id}), do: "/edit-extraction/#{id}"
-  defp correction_path(%{stage: :cleaning, item_id: id}), do: "/edit-cleaning/#{id}"
+  defp correction_path(%{stage: :extraction, item_id: id}), do: ~p"/edit-extraction/#{id}"
+  defp correction_path(%{stage: :cleaning, item_id: id}), do: ~p"/edit-cleaning/#{id}"
 end

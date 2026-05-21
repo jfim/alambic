@@ -19,6 +19,8 @@ defmodule AlambicWeb.Router do
 
     get "/", PageController, :home
     live "/queue", QueueLive, :index
+    live "/edit-extraction/:item_id", EditExtractionLive, :show
+    live "/edit-cleaning/:item_id", EditCleaningLive, :show
   end
 
   scope "/api", AlambicWeb do
