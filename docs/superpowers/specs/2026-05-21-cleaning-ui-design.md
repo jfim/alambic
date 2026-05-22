@@ -172,7 +172,7 @@ The two panes share vertical scroll independently. The article pane is `font-mon
 
 ### Article pane
 
-- Renders the source as a sequence of `<span>` runs derived from the sorted `discard_ranges`. Discarded spans get a strikethrough + dim styling and a `data-span-idx={n}` attribute. Kept runs are bare text nodes.
+- Renders the source as a sequence of `<span>` runs derived from the sorted `discard_ranges`. Discarded spans get a high-contrast pink/red background (e.g. Tailwind `bg-rose-200` with `text-rose-950`) and a `data-span-idx={n}` attribute. The goal is unmissable at a glance — not subtle. Kept runs are bare text nodes.
 - A LiveView hook captures `selectionchange` / `mouseup` on the article pane and computes the selection's start/end codepoint offsets relative to the source text. The hook pushes `{"add_span", start, stop}` to the server. Cancelled selections (collapsed or zero-width) are ignored.
 - Offset computation is done client-side from the rendered DOM: walk text nodes in document order, summing their `length`s until the selection's anchor/focus nodes are reached. This works because the rendered text is the source text byte-for-byte (no markdown rendering).
 - Server merges the new range with any overlapping or touching existing ranges, sorts, and reassigns to the in-memory `discard_ranges`. Re-renders.
