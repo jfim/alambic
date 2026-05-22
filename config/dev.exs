@@ -29,6 +29,18 @@ case System.get_env("CHAM_BASE_URL") do
     :ok
 end
 
+# Blob storage path — override in dev via BLOB_STORAGE_PATH env var.
+# Useful for sharing one blob store across multiple git worktrees so they
+# can read each other's saved revisions. Falls through to the value in
+# config/config.exs (tmp/blobs, relative to the working directory) when unset.
+case System.get_env("BLOB_STORAGE_PATH") do
+  path when is_binary(path) and path != "" ->
+    config :alambic, :blob_storage_path, path
+
+  _ ->
+    :ok
+end
+
 # For development, we disable any cache and enable
 # debugging and code reloading.
 #
