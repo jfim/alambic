@@ -170,4 +170,15 @@ defmodule AlambicWeb.EditCleaningLiveTest do
     {:ok, _view, html} = live(conn, ~p"/edit-cleaning/missing")
     assert html =~ "Could not fetch"
   end
+
+  describe "after=annotate redirect" do
+    test "save with ?after=annotate push_navigates to /annotate-cleaning", %{conn: conn} do
+      stub(Alambic.ChamMock, :fetch_cleaning_content, fn "annot-flow" -> {:ok, "hello world"} end)
+
+      {:ok, view, _html} = live(conn, ~p"/edit-cleaning/annot-flow?after=annotate")
+
+      assert {:error, {:live_redirect, %{to: "/annotate-cleaning"}}} =
+               render_click(view, "save")
+    end
+  end
 end

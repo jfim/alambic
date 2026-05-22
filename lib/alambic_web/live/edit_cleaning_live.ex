@@ -25,7 +25,8 @@ defmodule AlambicWeb.EditCleaningLive do
            view_revision: nil,
            viewed: nil,
            drift?: drift?,
-           error: nil
+           error: nil,
+           after_action: nil
          )}
 
       {:error, reason} ->
@@ -41,9 +42,20 @@ defmodule AlambicWeb.EditCleaningLive do
            view_revision: nil,
            viewed: nil,
            drift?: false,
-           error: inspect(reason)
+           error: inspect(reason),
+           after_action: nil
          )}
     end
+  end
+
+  def handle_params(params, _uri, socket) do
+    after_action =
+      case Map.get(params, "after") do
+        "annotate" -> :annotate
+        _ -> nil
+      end
+
+    {:noreply, assign(socket, after_action: after_action)}
   end
 
   defp initial_ranges(nil, _sha), do: {[], false}
@@ -85,13 +97,20 @@ defmodule AlambicWeb.EditCleaningLive do
         :ok = ReviewQueue.resolve(item_id, :cleaning)
         flash = if status == :unchanged, do: "Saved — no changes.", else: "Saved."
 
-        latest = Cleanings.latest(item_id)
-        history = Cleanings.history(item_id)
+        if socket.assigns.after_action == :annotate do
+          {:noreply,
+           socket
+           |> put_flash(:info, flash)
+           |> push_navigate(to: ~p"/annotate-cleaning")}
+        else
+          latest = Cleanings.latest(item_id)
+          history = Cleanings.history(item_id)
 
-        {:noreply,
-         socket
-         |> assign(latest: latest, history: history, drift?: false)
-         |> put_flash(:info, flash)}
+          {:noreply,
+           socket
+           |> assign(latest: latest, history: history, drift?: false)
+           |> put_flash(:info, flash)}
+        end
 
       {:error, reason} ->
         {:noreply, put_flash(socket, :error, "Save failed: #{inspect(reason)}")}
