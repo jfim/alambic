@@ -1,14 +1,23 @@
 import Config
 
 # Configure your database
-config :alambic, Alambic.Repo,
-  username: "postgres",
-  password: "postgres",
-  hostname: "localhost",
-  database: "alambic_dev",
-  stacktrace: true,
-  show_sensitive_data_on_connection_error: true,
-  pool_size: 10
+#
+# If DATABASE_URL is set (e.g. via a sourced .env file), it overrides the
+# username/password/hostname/database below. Useful for pointing dev at a
+# remote Postgres without editing this file.
+repo_connection_opts =
+  case System.get_env("DATABASE_URL") do
+    url when is_binary(url) and url != "" ->
+      [url: url]
+
+    _ ->
+      [username: "postgres", password: "postgres", hostname: "localhost", database: "alambic_dev"]
+  end
+
+config :alambic,
+       Alambic.Repo,
+       [stacktrace: true, show_sensitive_data_on_connection_error: true, pool_size: 10] ++
+         repo_connection_opts
 
 # For development, we disable any cache and enable
 # debugging and code reloading.
