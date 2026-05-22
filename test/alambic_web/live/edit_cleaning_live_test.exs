@@ -180,5 +180,55 @@ defmodule AlambicWeb.EditCleaningLiveTest do
       assert {:error, {:live_redirect, %{to: "/annotate-cleaning"}}} =
                render_click(view, "save")
     end
+
+    test "404 with ?after=annotate resolves the queue row and skips to next", %{conn: conn} do
+      stub(Alambic.ChamMock, :fetch_cleaning_content, fn "gone" -> {:error, {:status, 404}} end)
+
+      {:ok, _} =
+        ReviewQueue.enqueue(%{
+          item_id: "gone",
+          stage: :cleaning,
+          confidence: 0.1,
+          model_version: "v1"
+        })
+
+      assert {:error, {:live_redirect, %{to: "/annotate-cleaning"}}} =
+               live(conn, ~p"/edit-cleaning/gone?after=annotate")
+
+      assert ReviewQueue.list_pending() == []
+    end
+
+    test "404 without ?after=annotate still shows the error pane", %{conn: conn} do
+      stub(Alambic.ChamMock, :fetch_cleaning_content, fn "gone-manual" -> {:error, {:status, 404}} end)
+
+      {:ok, _} =
+        ReviewQueue.enqueue(%{
+          item_id: "gone-manual",
+          stage: :cleaning,
+          confidence: 0.1,
+          model_version: "v1"
+        })
+
+      {:ok, _view, html} = live(conn, ~p"/edit-cleaning/gone-manual")
+      assert html =~ "Could not fetch"
+      # Queue row is untouched on the manual path — user might want to retry.
+      assert [%{item_id: "gone-manual"}] = ReviewQueue.list_pending()
+    end
+
+    test "non-404 error with ?after=annotate still shows the error pane", %{conn: conn} do
+      stub(Alambic.ChamMock, :fetch_cleaning_content, fn _ -> {:error, {:status, 500}} end)
+
+      {:ok, _} =
+        ReviewQueue.enqueue(%{
+          item_id: "boom",
+          stage: :cleaning,
+          confidence: 0.1,
+          model_version: "v1"
+        })
+
+      {:ok, _view, html} = live(conn, ~p"/edit-cleaning/boom?after=annotate")
+      assert html =~ "Could not fetch"
+      assert [%{item_id: "boom"}] = ReviewQueue.list_pending()
+    end
   end
 end
