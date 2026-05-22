@@ -53,8 +53,13 @@ defmodule AlambicWeb.EditCleaningLive do
   end
 
   def handle_event("add_span", %{"start" => s, "stop" => e}, socket) do
-    {s, e} = {to_int(s), to_int(e)}
-    {:noreply, assign(socket, ranges: Ranges.merge_in(socket.assigns.ranges, [s, e]))}
+    case clamp_range(to_int(s), to_int(e), socket.assigns.text_length) do
+      {:ok, [s, e]} ->
+        {:noreply, assign(socket, ranges: Ranges.merge_in(socket.assigns.ranges, [s, e]))}
+
+      :invalid ->
+        {:noreply, socket}
+    end
   end
 
   def handle_event("delete_span", %{"index" => idx}, socket) do
@@ -62,10 +67,14 @@ defmodule AlambicWeb.EditCleaningLive do
   end
 
   def handle_event("edit_range", %{"index" => idx, "start" => s, "stop" => e}, socket) do
-    {:noreply,
-     assign(socket,
-       ranges: Ranges.replace(socket.assigns.ranges, to_int(idx), [to_int(s), to_int(e)])
-     )}
+    case clamp_range(to_int(s), to_int(e), socket.assigns.text_length) do
+      {:ok, [s, e]} ->
+        {:noreply,
+         assign(socket, ranges: Ranges.replace(socket.assigns.ranges, to_int(idx), [s, e]))}
+
+      :invalid ->
+        {:noreply, socket}
+    end
   end
 
   def handle_event("save", _params, socket) do
@@ -133,6 +142,13 @@ defmodule AlambicWeb.EditCleaningLive do
 
   def handle_event("return_to_latest", _params, socket) do
     {:noreply, assign(socket, view_revision: nil, viewed: nil)}
+  end
+
+  defp clamp_range(s, e, text_length) do
+    s = max(0, s)
+    e = min(text_length, e)
+
+    if s < e, do: {:ok, [s, e]}, else: :invalid
   end
 
   defp normalize(text), do: :unicode.characters_to_nfc_binary(text)
@@ -206,15 +222,7 @@ defmodule AlambicWeb.EditCleaningLive do
             data-read-only={if @view_revision, do: "true", else: "false"}
             data-full-text={current_text(assigns)}
             class="rounded border bg-white p-3 font-mono text-sm whitespace-pre-wrap overflow-auto max-h-[80vh]"
-          >
-            <%= for {kind, text, idx} <- render_text_with_spans(current_text(assigns), current_ranges(assigns)) do %>
-              <%= if kind == :discard do %>
-                <span class={"bg-rose-200 text-rose-950"} data-span-idx={to_string(idx)}>{text}</span>
-              <% else %>
-                {text}
-              <% end %>
-            <% end %>
-          </div>
+          >{render_article_html(current_text(assigns), current_ranges(assigns))}</div>
 
           <div class="rounded border bg-white p-3 overflow-auto max-h-[80vh]">
             <h2 class="text-sm font-medium mb-2">Spans ({length(current_ranges(assigns))})</h2>
@@ -297,6 +305,32 @@ defmodule AlambicWeb.EditCleaningLive do
       <% end %>
     </div>
     """
+  end
+
+  # Renders the article pane content as safe iodata with NO surrounding
+  # whitespace, so the DOM's text content exactly matches the source text.
+  # The HEEx template MUST place the call flush against the opening and
+  # closing tags of #article-pane — any whitespace there would otherwise be
+  # rendered (the pane uses `whitespace-pre-wrap`) and inflate the JS hook's
+  # offset count.
+  defp render_article_html(text, ranges) do
+    text
+    |> render_text_with_spans(ranges)
+    |> Enum.map(fn
+      {:keep, t, _} ->
+        Phoenix.HTML.html_escape(t) |> Phoenix.HTML.safe_to_string()
+
+      {:discard, t, idx} ->
+        [
+          ~s|<span class="bg-rose-200 text-rose-950" data-span-idx="|,
+          Integer.to_string(idx),
+          ~s|">|,
+          Phoenix.HTML.html_escape(t) |> Phoenix.HTML.safe_to_string(),
+          ~s|</span>|
+        ]
+    end)
+    |> IO.iodata_to_binary()
+    |> Phoenix.HTML.raw()
   end
 
   # Returns a list of {kind, text, idx} tuples where kind is :keep or :discard.
