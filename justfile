@@ -60,6 +60,6 @@ docker-build:
 db-seed:
     mix run priv/repo/seeds.exs
 
-# Enqueue the last N article ids into the prod cleaning review queue (default 100)
+# Enqueue the newest N article ids into the prod cleaning review queue (default 100)
 enqueue-cleaning count="100":
     ./scripts/enqueue-cleaning-review.sh {{count}}
