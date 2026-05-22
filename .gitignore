@@ -48,3 +48,6 @@ npm-debug.log
 
 .claude
 build_and_push.sh
+
+*.swp
+*.swo
