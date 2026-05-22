@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 #
-# Enqueue the last N article IDs from `cham item list` into the cleaning
-# review queue on prod (alambic running in docker on jfim-dedibox-b).
+# Enqueue the first N article IDs from `cham item list` (newest items
+# come first) into the cleaning review queue on prod (alambic running in
+# docker on jfim-dedibox-b).
 #
 # Usage:
 #   scripts/enqueue-cleaning-review.sh [count]
 #
-#   count   number of trailing items to enqueue (default: 100)
+#   count   number of leading (newest) items to enqueue (default: 100)
 #
 # Dry-run (just print the IDs, don't touch prod):
 #   DRY_RUN=1 scripts/enqueue-cleaning-review.sh 50
@@ -23,7 +24,7 @@ if ! [[ "$COUNT" =~ ^[0-9]+$ ]]; then
   exit 1
 fi
 
-ids_json="$(cham item list --type article --json | jq -c "[.[-${COUNT}:] | .[].id]")"
+ids_json="$(cham item list --type article --json | jq -c "[.[:${COUNT}] | .[].id]")"
 id_count="$(jq 'length' <<<"$ids_json")"
 
 if [[ "$id_count" -eq 0 ]]; then
@@ -31,7 +32,7 @@ if [[ "$id_count" -eq 0 ]]; then
   exit 0
 fi
 
-echo "selected $id_count item ids (last $COUNT of cham item list)" >&2
+echo "selected $id_count item ids (first $COUNT of cham item list)" >&2
 
 # Build the remote iex snippet. We embed the JSON list literal directly into
 # Elixir — JSON arrays of strings are valid Elixir list literals, so no parsing
