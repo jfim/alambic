@@ -158,7 +158,7 @@ defmodule AlambicWeb.EditCleaningLive do
 
   def render(assigns) do
     ~H"""
-    <div class="mx-auto max-w-7xl p-4">
+    <div class="mx-auto max-w-[min(100%,1800px)] p-4">
       <header class="flex items-center justify-between mb-3">
         <div>
           <h1 class="text-xl font-semibold">Edit cleaning · {@item_id}</h1>
