@@ -29,7 +29,7 @@ defmodule AlambicWeb.EditCleaningLiveTest do
     {:ok, view, _html} = live(conn, ~p"/edit-cleaning/abc")
     view |> element("button", "Confirm") |> render_click()
 
-    assert %Alambic.Cleanings.Cleaning{} = Cleanings.get("abc")
+    assert %Alambic.Cleanings.Revision{} = Cleanings.latest("abc")
     assert ReviewQueue.list_pending() == []
   end
 end

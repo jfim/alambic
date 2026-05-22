@@ -34,8 +34,8 @@ defmodule Alambic.DatasetsTest do
   end
 
   test "cleaning parquet carries discard_ranges as list of lists" do
-    {:ok, _} =
-      Cleanings.save_with_text(%{item_id: "c1", discard_ranges: [[0, 3], [7, 10]]}, "abcdefghij")
+    {:ok, _, :inserted} =
+      Cleanings.save_revision("c1", "abcdefghij", [[0, 3], [7, 10]])
 
     bytes = Datasets.export_parquet(:cleaning) |> IO.iodata_to_binary()
     path = Path.join(System.tmp_dir!(), "alambic_t_#{System.unique_integer([:positive])}.parquet")
@@ -46,6 +46,23 @@ defmodule Alambic.DatasetsTest do
     row = Explorer.DataFrame.to_rows(df) |> hd()
     assert row["item_id"] == "c1"
     assert row["discard_ranges"] == [[0, 3], [7, 10]]
+  end
+
+  test "cleaning parquet exports only the latest revision per item" do
+    {:ok, _, :inserted} = Cleanings.save_revision("c2", "first text", [[0, 3]])
+    {:ok, _, :inserted} = Cleanings.save_revision("c2", "second text", [[1, 4]])
+
+    bytes = Datasets.export_parquet(:cleaning) |> IO.iodata_to_binary()
+    path = Path.join(System.tmp_dir!(), "alambic_t_#{System.unique_integer([:positive])}.parquet")
+    File.write!(path, bytes)
+    df = Explorer.DataFrame.from_parquet!(path)
+    File.rm!(path)
+
+    rows = Explorer.DataFrame.to_rows(df)
+    assert length(rows) == 1
+    row = hd(rows)
+    assert row["item_id"] == "c2"
+    assert row["discard_ranges"] == [[1, 4]]
   end
 
   test "empty stage returns valid empty parquet" do

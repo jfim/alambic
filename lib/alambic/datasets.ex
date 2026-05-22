@@ -24,15 +24,15 @@ defmodule Alambic.Datasets do
   end
 
   def export_parquet(:cleaning) do
-    rows = Cleanings.list_all()
+    rows = Cleanings.list_latest()
 
     df =
       DataFrame.new(%{
         "item_id" => Enum.map(rows, & &1.item_id),
         "content_sha256" => Enum.map(rows, & &1.content_sha256),
         "discard_ranges" => Enum.map(rows, & &1.discard_ranges),
-        "confirmed_at" => Enum.map(rows, &DateTime.to_unix(&1.confirmed_at)),
-        "updated_at" => Enum.map(rows, &DateTime.to_unix(&1.updated_at)),
+        "confirmed_at" => Enum.map(rows, &DateTime.to_unix(&1.created_at)),
+        "updated_at" => Enum.map(rows, &DateTime.to_unix(&1.created_at)),
         "prior_model_version" => Enum.map(rows, & &1.model_version)
       })
 
