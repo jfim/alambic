@@ -57,7 +57,7 @@ if config_env() == :prod do
     cham_base_url: System.fetch_env!("ARCHIVE_BASE_URL"),
     review_confidence_threshold:
       "REVIEW_CONFIDENCE_THRESHOLD" |> System.get_env("0.7") |> String.to_float(),
-    cham_raw_html_filename: System.get_env("CHAM_RAW_HTML_FILENAME", "original.html")
+    cham_extraction_html_filename: System.get_env("CHAM_EXTRACTION_HTML_FILENAME", "original.html")
 
   config :alambic,
          :blob_storage_path,

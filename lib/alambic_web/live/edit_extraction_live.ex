@@ -6,7 +6,7 @@ defmodule AlambicWeb.EditExtractionLive do
   @placeholder_xpath "/html/body"
 
   def mount(%{"item_id" => item_id}, _session, socket) do
-    case Cham.fetch_html(item_id) do
+    case Cham.fetch_extraction_html(item_id) do
       {:ok, raw_html} ->
         {:ok,
          assign(socket,

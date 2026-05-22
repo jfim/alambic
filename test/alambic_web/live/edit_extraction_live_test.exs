@@ -9,7 +9,7 @@ defmodule AlambicWeb.EditExtractionLiveTest do
   setup :verify_on_exit!
 
   test "renders sanitized fetched HTML inline", %{conn: conn} do
-    stub(Alambic.ChamMock, :fetch_html, fn "abc" ->
+    stub(Alambic.ChamMock, :fetch_extraction_html, fn "abc" ->
       {:ok, ~s{<html><body><p>hi</p><script>alert(1)</script></body></html>}}
     end)
 
@@ -20,14 +20,14 @@ defmodule AlambicWeb.EditExtractionLiveTest do
   end
 
   test "renders a fetch error when Cham fails", %{conn: conn} do
-    stub(Alambic.ChamMock, :fetch_html, fn _ -> {:error, {:status, 404}} end)
+    stub(Alambic.ChamMock, :fetch_extraction_html, fn _ -> {:error, {:status, 404}} end)
 
     {:ok, _view, html} = live(conn, ~p"/edit-extraction/missing")
     assert html =~ "Could not fetch HTML"
   end
 
   test "confirm writes an extraction and resolves the queue", %{conn: conn} do
-    stub(Alambic.ChamMock, :fetch_html, fn _ -> {:ok, "<html/>"} end)
+    stub(Alambic.ChamMock, :fetch_extraction_html, fn _ -> {:ok, "<html/>"} end)
 
     {:ok, _} =
       ReviewQueue.enqueue(%{
