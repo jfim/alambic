@@ -1101,6 +1101,33 @@ defmodule AlambicWeb.EditCleaningLiveTest do
     assert html =~ ~s|disabled|
   end
 
+  test "shows confirmed-empty chip when latest revision has [] ranges and matches", %{conn: conn} do
+    text = "no junk here"
+    stub(Alambic.ChamMock, :fetch_cleaning_content, fn _ -> {:ok, text} end)
+    {:ok, _, :inserted} = Cleanings.save_revision("empty-ok", text, [])
+
+    {:ok, _view, html} = live(conn, ~p"/edit-cleaning/empty-ok")
+    assert html =~ "Confirmed: nothing to discard"
+    refute html =~ "No spans yet"
+  end
+
+  test "shows unlabeled-empty placeholder when no revision exists", %{conn: conn} do
+    stub(Alambic.ChamMock, :fetch_cleaning_content, fn _ -> {:ok, "fresh article"} end)
+
+    {:ok, _view, html} = live(conn, ~p"/edit-cleaning/fresh")
+    assert html =~ "No spans yet"
+    refute html =~ "Confirmed: nothing to discard"
+  end
+
+  test "save with empty ranges creates a confirmed-empty revision", %{conn: conn} do
+    stub(Alambic.ChamMock, :fetch_cleaning_content, fn _ -> {:ok, "confirm empty"} end)
+
+    {:ok, view, _} = live(conn, ~p"/edit-cleaning/conf-empty")
+    view |> element("button", "Save") |> render_click()
+
+    assert %{revision_id: 1, discard_ranges: []} = Cleanings.latest("conf-empty")
+  end
+
   test "renders error pane when Cham fetch fails", %{conn: conn} do
     stub(Alambic.ChamMock, :fetch_cleaning_content, fn _ -> {:error, {:status, 404}} end)
 
@@ -1304,6 +1331,17 @@ defmodule AlambicWeb.EditCleaningLive do
 
           <div class="rounded border bg-white p-3 overflow-auto max-h-[80vh]">
             <h2 class="text-sm font-medium mb-2">Spans ({length(current_ranges(assigns))})</h2>
+            <%= if current_ranges(assigns) == [] do %>
+              <%= if confirmed_empty?(assigns) do %>
+                <p class="text-sm text-emerald-700 bg-emerald-50 rounded p-2">
+                  ✓ Confirmed: nothing to discard in this revision.
+                </p>
+              <% else %>
+                <p class="text-sm text-zinc-500">
+                  No spans yet. Select text in the article to add one.
+                </p>
+              <% end %>
+            <% end %>
             <ul class="space-y-2">
               <%= for {[s, e], idx} <- Enum.with_index(current_ranges(assigns)) do %>
                 <li class="flex items-center gap-2 text-sm" data-span-idx={idx}>
@@ -1417,6 +1455,16 @@ defmodule AlambicWeb.EditCleaningLive do
   defp has_next?(%{view_revision: v, history: history}) do
     Enum.any?(history, fn r -> r.revision_id > v end)
   end
+
+  defp confirmed_empty?(%{
+         view_revision: nil,
+         drift?: false,
+         latest: %{discard_ranges: [], content_sha256: sha},
+         text_sha: sha
+       }),
+       do: true
+
+  defp confirmed_empty?(_), do: false
 end
 ```
 

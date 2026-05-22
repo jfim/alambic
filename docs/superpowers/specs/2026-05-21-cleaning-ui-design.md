@@ -180,6 +180,11 @@ The two panes share vertical scroll independently. The article pane is `font-mon
 
 ### Span pane
 
+- **Empty-state disambiguation.** When `discard_ranges` is empty, the span pane shows a placeholder whose copy depends on whether the empty state is *confirmed* or *unlabeled*:
+  - **Confirmed empty** (`latest != nil` AND `latest.content_sha256 == live_sha` AND `latest.discard_ranges == []`): show a check-marked chip "✓ Confirmed: nothing to discard in this revision." This is the legitimate ground-truth-empty case.
+  - **Unlabeled** (no revision OR drift case): show "No spans yet. Select text in the article to add one."
+  - This is the only visual cue that distinguishes a deliberate empty annotation from a not-yet-labeled article — the "Latest · rev N" chip in the header confirms it from the other side.
+- Save with empty `discard_ranges` is valid and meaningful: it asserts "I reviewed this and nothing needs to be discarded." Dedup against a prior empty-ranges revision still applies (no duplicate row created), but the queue entry resolves either way.
 - One row per span, ordered by `start` ascending.
 - Each row:
   - Truncated source text with `text-overflow: ellipsis` and `title={full_text}`.
