@@ -61,8 +61,9 @@ defmodule AlambicWeb.EditCleaningLiveTest do
     render_hook(view, "add_span", %{"start" => 3, "stop" => 7})
 
     html = render(view)
-    assert html =~ "1–7"
-    refute html =~ "1–4"
+    assert html =~ ~r/value="1"\s+name="start"/
+    assert html =~ ~r/value="7"\s+name="stop"/
+    refute html =~ ~r/value="4"\s+name="stop"/
   end
 
   test "delete_span removes a span by index", %{conn: conn} do
@@ -75,8 +76,9 @@ defmodule AlambicWeb.EditCleaningLiveTest do
     view |> element(~s|button[phx-value-index="0"][phx-click="delete_span"]|) |> render_click()
 
     html = render(view)
-    refute html =~ "0–3"
-    assert html =~ "5–7"
+    refute html =~ ~r/value="0"\s+name="start"/
+    assert html =~ ~r/value="5"\s+name="start"/
+    assert html =~ ~r/value="7"\s+name="stop"/
   end
 
   test "edit_range validates and merges", %{conn: conn} do
@@ -87,12 +89,14 @@ defmodule AlambicWeb.EditCleaningLiveTest do
     render_hook(view, "edit_range", %{"index" => 0, "start" => 0, "stop" => 5})
 
     html = render(view)
-    assert html =~ "0–5"
+    assert html =~ ~r/value="0"\s+name="start"/
+    assert html =~ ~r/value="5"\s+name="stop"/
 
     # invalid (start >= stop) is a no-op
     render_hook(view, "edit_range", %{"index" => 0, "start" => 5, "stop" => 5})
     html = render(view)
-    assert html =~ "0–5"
+    assert html =~ ~r/value="0"\s+name="start"/
+    assert html =~ ~r/value="5"\s+name="stop"/
   end
 
   test "save inserts a revision and resolves the queue", %{conn: conn} do
