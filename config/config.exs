@@ -65,6 +65,7 @@ config :alambic,
   cham_impl: Alambic.Cham.HTTP,
   cham_base_url: "http://localhost:4001",
   cham_extraction_html_filename: "original.html",
+  cham_cleaning_content_filename: "content.md",
   review_confidence_threshold: 0.7,
   scripts_path: "scripts"
 
