@@ -1,54 +1,134 @@
 defmodule Alambic.Cleanings do
+  @moduledoc """
+  Cleaning revisions context.
+
+  Each `save_revision/4` produces a new row in `cleaning_revisions` unless the
+  `(content_sha256, discard_ranges)` pair matches the latest stored revision for
+  the same `item_id`, in which case it returns `:unchanged`.
+
+  Text input is NFC-normalized before hashing and storage, so semantically
+  equivalent inputs share a blob and a sha.
+  """
+
   alias Alambic.BlobStore
-  alias Alambic.Cleanings.Cleaning
+  alias Alambic.Cleanings.Revision
   alias Alambic.Repo
 
-  def get(item_id), do: Repo.get(Cleaning, item_id)
-
-  def list_all, do: Repo.all(Cleaning)
+  import Ecto.Query
 
   @doc """
-  Stores `text` (markdown from Cham) in the blob store and upserts a cleaning row.
-
-  `text` must be valid UTF-8; it is normalized to Unicode NFC before hashing
-  so semantically equivalent inputs share a blob. `attrs` carries `:item_id`,
-  `:discard_ranges` (list of `[start, stop]` over **codepoint** offsets of the
-  normalized text), and optionally `:model_version` / `:confirmed_at`.
+  Returns the latest revision for an item, or `nil` if none exist.
   """
-  def save_with_text(attrs, text) when is_binary(text) do
+  def latest(item_id) do
+    from(r in Revision,
+      where: r.item_id == ^item_id,
+      order_by: [desc: r.revision_id],
+      limit: 1
+    )
+    |> Repo.one()
+  end
+
+  @doc """
+  Returns all revisions for an item, ascending by `revision_id`.
+  """
+  def history(item_id) do
+    from(r in Revision,
+      where: r.item_id == ^item_id,
+      order_by: [asc: r.revision_id]
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  Returns all *latest* revisions across items (one row per item). Used by the
+  dataset export.
+  """
+  def list_latest do
+    sub =
+      from(r in Revision,
+        select: %{item_id: r.item_id, max_rev: max(r.revision_id)},
+        group_by: r.item_id
+      )
+
+    from(r in Revision,
+      join: l in subquery(sub),
+      on: l.item_id == r.item_id and l.max_rev == r.revision_id
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  NFC-normalizes `text`, stores it in the blob store, and inserts a new
+  revision row unless it would be a no-op duplicate of the latest revision.
+
+  `opts` may carry `:model_version` and `:created_at`.
+
+  Returns `{:ok, %Revision{}, :inserted | :unchanged}` on success or
+  `{:error, :invalid_utf8}` if the text is not valid UTF-8.
+  """
+  def save_revision(item_id, text, discard_ranges, opts \\ [])
+      when is_binary(item_id) and is_binary(text) and is_list(discard_ranges) do
     case :unicode.characters_to_nfc_binary(text) do
       normalized when is_binary(normalized) ->
         {:ok, sha} = BlobStore.put(normalized)
-        item_id = Map.get(attrs, :item_id) || Map.get(attrs, "item_id")
-        existing = item_id && Repo.get(Cleaning, item_id)
-
-        (existing || %Cleaning{})
-        |> Cleaning.changeset(Map.put(attrs, :content_sha256, sha))
-        |> Repo.insert_or_update()
+        do_save(item_id, sha, discard_ranges, opts)
 
       {:error, _, _} ->
         {:error, :invalid_utf8}
     end
   end
 
-  def delete(item_id) do
-    case Repo.get(Cleaning, item_id) do
-      nil ->
-        :ok
+  defp do_save(item_id, sha, ranges, opts) do
+    case latest(item_id) do
+      %Revision{content_sha256: ^sha, discard_ranges: ^ranges} = current ->
+        {:ok, current, :unchanged}
 
-      row ->
-        {:ok, _} = Repo.delete(row)
-        :ok = BlobStore.delete(row.content_sha256)
-        :ok
+      latest_rev ->
+        next_id = (latest_rev && latest_rev.revision_id + 1) || 1
+
+        attrs =
+          %{
+            item_id: item_id,
+            revision_id: next_id,
+            content_sha256: sha,
+            discard_ranges: ranges
+          }
+          |> maybe_put(opts, :model_version)
+          |> maybe_put(opts, :created_at)
+
+        %Revision{}
+        |> Revision.changeset(attrs)
+        |> Repo.insert()
+        |> case do
+          {:ok, row} -> {:ok, row, :inserted}
+          {:error, _} = err -> err
+        end
+    end
+  end
+
+  defp maybe_put(map, opts, key) do
+    case Keyword.fetch(opts, key) do
+      {:ok, v} -> Map.put(map, key, v)
+      :error -> map
     end
   end
 
   @doc """
-  Applies the row's discard ranges to the given source text, returning the kept content.
+  Deletes every revision row for `item_id` and best-effort deletes their blobs.
+  """
+  def delete_all(item_id) do
+    rows = history(item_id)
+    {_n, _} = Repo.delete_all(from r in Revision, where: r.item_id == ^item_id)
 
-  Ranges are list of `[start, stop]` half-open intervals over **codepoint** offsets
-  of the NFC-normalized source. `source` is assumed to already be NFC UTF-8 (as
-  produced by `save_with_text/2`).
+    Enum.each(rows, fn r -> BlobStore.delete(r.content_sha256) end)
+    :ok
+  end
+
+  @doc """
+  Applies the discard ranges to `source` text, returning the kept content.
+
+  Ranges are list of `[start, stop]` half-open intervals over **codepoint**
+  offsets of the NFC-normalized source.
   """
   def apply_discard_ranges(source, ranges) when is_binary(source) and is_list(ranges) do
     codepoints = String.to_charlist(source)

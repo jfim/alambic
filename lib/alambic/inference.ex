@@ -28,7 +28,7 @@ defmodule Alambic.Inference do
   end
 
   def clean(item_id, text) do
-    case Cleanings.get(item_id) do
+    case Cleanings.latest(item_id) do
       %{content_sha256: sha, discard_ranges: ranges} ->
         {:ok, source} = Alambic.BlobStore.get(sha)
         cleaned = Cleanings.apply_discard_ranges(source, ranges)

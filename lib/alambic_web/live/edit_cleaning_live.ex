@@ -26,11 +26,8 @@ defmodule AlambicWeb.EditCleaningLive do
   end
 
   def handle_event("confirm", _params, socket) do
-    {:ok, _} =
-      Cleanings.save_with_text(
-        %{item_id: socket.assigns.item_id, discard_ranges: []},
-        socket.assigns.raw_html || ""
-      )
+    {:ok, _, _} =
+      Cleanings.save_revision(socket.assigns.item_id, "placeholder", [])
 
     :ok = ReviewQueue.resolve(socket.assigns.item_id, :cleaning)
     {:noreply, put_flash(socket, :info, "Cleaning confirmed.")}

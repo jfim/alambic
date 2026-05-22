@@ -79,17 +79,14 @@ defmodule Alambic.InferenceTest do
   end
 
   test "clean/2 returns kept text after discarding ranges" do
-    {:ok, _} =
-      Cleanings.save_with_text(
-        %{item_id: "x1", discard_ranges: [[0, 8]]},
-        "drop me keep me"
-      )
+    {:ok, _, :inserted} =
+      Cleanings.save_revision("x1", "drop me keep me", [[0, 8]])
 
     assert {:ok, %{cleaned_text: "keep me", source: :saved}} = Inference.clean("x1", "ignored")
   end
 
   test "clean/2 returns full source when no ranges" do
-    {:ok, _} = Cleanings.save_with_text(%{item_id: "x", discard_ranges: []}, "hi")
+    {:ok, _, :inserted} = Cleanings.save_revision("x", "hi", [])
     assert {:ok, %{item_id: "x", source: :saved, cleaned_text: "hi"}} = Inference.clean("x", "hi")
   end
 
