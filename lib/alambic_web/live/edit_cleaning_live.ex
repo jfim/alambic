@@ -214,7 +214,7 @@ defmodule AlambicWeb.EditCleaningLive do
           </div>
         <% end %>
 
-        <div class="grid grid-cols-[2fr_1fr] gap-3">
+        <div class="grid grid-cols-[minmax(0,1fr)_320px] gap-3">
           <div
             id="article-pane"
             phx-hook="CleaningSelection"
@@ -241,47 +241,40 @@ defmodule AlambicWeb.EditCleaningLive do
               <%= for {[s, e], idx} <- Enum.with_index(current_ranges(assigns)) do %>
                 <li class="flex items-center gap-2 text-sm" data-span-idx={idx}>
                   <span
-                    class="truncate max-w-[10rem]"
+                    class="truncate min-w-0 flex-1"
                     title={String.slice(current_text(assigns), s, e - s)}
-                  >
-                    {String.slice(current_text(assigns), s, e - s)}
-                  </span>
-                  <span class="text-zinc-400 text-xs whitespace-nowrap">
-                    <%= if @view_revision do %>
-                      {s}–{e}
-                    <% else %>
-                      <span class="text-zinc-500 mr-1">{s}–{e}</span>
+                  ><%= String.slice(current_text(assigns), s, e - s) %></span>
+                  <%= if @view_revision do %>
+                    <span class="text-zinc-500 text-xs whitespace-nowrap">{s}–{e}</span>
+                  <% else %>
+                    <form
+                      phx-change="edit_range"
+                      phx-value-index={idx}
+                      class="flex items-center gap-1 shrink-0"
+                    >
                       <input
                         type="number"
                         min="0"
                         max={current_length(assigns)}
                         value={s}
-                        phx-blur="edit_range"
-                        phx-value-index={idx}
-                        phx-value-stop={e}
                         name="start"
-                        class="w-16 border rounded px-1 text-right"
+                        class="w-16 border rounded px-1 text-right text-xs"
                       />
-                      –
+                      <span class="text-zinc-400">–</span>
                       <input
                         type="number"
                         min="0"
                         max={current_length(assigns)}
                         value={e}
-                        phx-blur="edit_range"
-                        phx-value-index={idx}
-                        phx-value-start={s}
                         name="stop"
-                        class="w-16 border rounded px-1 text-right"
+                        class="w-16 border rounded px-1 text-right text-xs"
                       />
-                    <% end %>
-                  </span>
-                  <%= unless @view_revision do %>
+                    </form>
                     <button
                       phx-click="delete_span"
                       phx-value-index={idx}
                       title="Delete span"
-                      class="ml-auto text-zinc-500 hover:text-rose-600"
+                      class="text-zinc-500 hover:text-rose-600 shrink-0"
                     >
                       🗑
                     </button>
