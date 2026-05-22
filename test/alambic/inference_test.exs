@@ -129,4 +129,12 @@ defmodule Alambic.InferenceTest do
 
     assert {:ok, %{source: :model}} = Inference.clean("fresh", "totally unrelated")
   end
+
+  test "clean/2 falls through to model when the saved row's blob is missing" do
+    {:ok, rev, :inserted} = Cleanings.save_revision("orphan", "abc", [])
+    :ok = Alambic.BlobStore.delete(rev.content_sha256)
+    seed_active_model(:cleaning, "cleaning-dummy.1", "scripts/clean")
+
+    assert {:ok, %{source: :model}} = Inference.clean("orphan", "abc")
+  end
 end

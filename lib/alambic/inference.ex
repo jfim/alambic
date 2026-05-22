@@ -6,6 +6,8 @@ defmodule Alambic.Inference do
   emit a JSON object on stdout; the facade attaches `model_version` and `source`.
   """
 
+  require Logger
+
   alias Alambic.{Cleanings, Extractions, Models, ReviewQueue, ScriptRunner}
 
   @script_timeout 30_000
@@ -28,33 +30,36 @@ defmodule Alambic.Inference do
   end
 
   def clean(item_id, text) do
-    case Cleanings.latest(item_id) do
-      %{content_sha256: sha, discard_ranges: ranges} ->
-        respond_with_saved(item_id, sha, ranges, :saved)
-
-      nil ->
-        case Cleanings.find_latest_by_text(text) do
-          %{content_sha256: sha, discard_ranges: ranges} ->
-            respond_with_saved(item_id, sha, ranges, :saved_by_content)
-
-          nil ->
-            run_model(:cleaning, item_id, text, &decode_clean/1)
-        end
+    with nil <- try_saved(item_id, :saved, Cleanings.latest(item_id)),
+         nil <- try_saved(item_id, :saved_by_content, Cleanings.find_latest_by_text(text)) do
+      run_model(:cleaning, item_id, text, &decode_clean/1)
     end
   end
 
-  defp respond_with_saved(item_id, sha, ranges, source) do
-    {:ok, blob} = Alambic.BlobStore.get(sha)
-    cleaned = Cleanings.apply_discard_ranges(blob, ranges)
+  # Returns {:ok, response} when the revision's blob is present, nil when the
+  # revision was nil or its blob is missing on disk. The caller falls through
+  # to the next lookup layer (content-hash, then the model) on nil.
+  defp try_saved(_item_id, _source, nil), do: nil
 
-    {:ok,
-     %{
-       item_id: item_id,
-       cleaned_text: cleaned,
-       source: source,
-       model_version: nil,
-       confidence: nil
-     }}
+  defp try_saved(item_id, source, %{content_sha256: sha, discard_ranges: ranges}) do
+    case Alambic.BlobStore.get(sha) do
+      {:ok, blob} ->
+        {:ok,
+         %{
+           item_id: item_id,
+           cleaned_text: Cleanings.apply_discard_ranges(blob, ranges),
+           source: source,
+           model_version: nil,
+           confidence: nil
+         }}
+
+      :not_found ->
+        Logger.warning(
+          "Inference.clean: blob #{sha} missing for #{source} lookup (item_id=#{item_id}); falling through"
+        )
+
+        nil
+    end
   end
 
   defp run_model(stage, item_id, input, decoder) do
