@@ -34,7 +34,7 @@ defmodule AlambicWeb.EditCleaningLiveTest do
   test "pre-populates discard ranges from latest revision when hash matches", %{conn: conn} do
     text = "Hello sponsored world"
     stub(Alambic.ChamMock, :fetch_cleaning_content, fn _ -> {:ok, text} end)
-    {:ok, _, :inserted} = Cleanings.save_revision("matched", text, [[6, 16]])
+    {:ok, _, :inserted} = Cleanings.save_revision("matched", text, [[6, 16]], source: "human")
 
     {:ok, _view, html} = live(conn, ~p"/edit-cleaning/matched")
 
@@ -46,7 +46,7 @@ defmodule AlambicWeb.EditCleaningLiveTest do
 
   test "shows drift banner when latest hash differs from live text", %{conn: conn} do
     stub(Alambic.ChamMock, :fetch_cleaning_content, fn _ -> {:ok, "new text"} end)
-    {:ok, _, :inserted} = Cleanings.save_revision("drift", "old text", [[0, 3]])
+    {:ok, _, :inserted} = Cleanings.save_revision("drift", "old text", [[0, 3]], source: "human")
 
     {:ok, _view, html} = live(conn, ~p"/edit-cleaning/drift")
 
@@ -113,7 +113,7 @@ defmodule AlambicWeb.EditCleaningLiveTest do
 
   test "save dedups identical (content, ranges) but still resolves queue", %{conn: conn} do
     stub(Alambic.ChamMock, :fetch_cleaning_content, fn _ -> {:ok, "abcdef"} end)
-    {:ok, _, :inserted} = Cleanings.save_revision("dedup", "abcdef", [[0, 3]])
+    {:ok, _, :inserted} = Cleanings.save_revision("dedup", "abcdef", [[0, 3]], source: "human")
     {:ok, _} = ReviewQueue.enqueue(%{item_id: "dedup", stage: :cleaning, confidence: 0.1, model_version: "v1"})
 
     {:ok, view, _} = live(conn, ~p"/edit-cleaning/dedup")
@@ -125,8 +125,8 @@ defmodule AlambicWeb.EditCleaningLiveTest do
 
   test "Prev shows historical revision read-only", %{conn: conn} do
     stub(Alambic.ChamMock, :fetch_cleaning_content, fn _ -> {:ok, "current text"} end)
-    {:ok, _, :inserted} = Cleanings.save_revision("hist", "old text", [[0, 3]])
-    {:ok, _, :inserted} = Cleanings.save_revision("hist", "current text", [[8, 12]])
+    {:ok, _, :inserted} = Cleanings.save_revision("hist", "old text", [[0, 3]], source: "human")
+    {:ok, _, :inserted} = Cleanings.save_revision("hist", "current text", [[8, 12]], source: "human")
 
     {:ok, view, _} = live(conn, ~p"/edit-cleaning/hist")
     view |> element("button", "Prev") |> render_click()
@@ -140,7 +140,7 @@ defmodule AlambicWeb.EditCleaningLiveTest do
   test "shows confirmed-empty chip when latest revision has [] ranges and matches", %{conn: conn} do
     text = "no junk here"
     stub(Alambic.ChamMock, :fetch_cleaning_content, fn _ -> {:ok, text} end)
-    {:ok, _, :inserted} = Cleanings.save_revision("empty-ok", text, [])
+    {:ok, _, :inserted} = Cleanings.save_revision("empty-ok", text, [], source: "human")
 
     {:ok, _view, html} = live(conn, ~p"/edit-cleaning/empty-ok")
     assert html =~ "Confirmed: nothing to discard"

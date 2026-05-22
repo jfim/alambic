@@ -80,13 +80,13 @@ defmodule Alambic.InferenceTest do
 
   test "clean/2 returns kept text after discarding ranges" do
     {:ok, _, :inserted} =
-      Cleanings.save_revision("x1", "drop me keep me", [[0, 8]])
+      Cleanings.save_revision("x1", "drop me keep me", [[0, 8]], source: "human")
 
     assert {:ok, %{cleaned_text: "keep me", source: :saved}} = Inference.clean("x1", "ignored")
   end
 
   test "clean/2 returns full source when no ranges" do
-    {:ok, _, :inserted} = Cleanings.save_revision("x", "hi", [])
+    {:ok, _, :inserted} = Cleanings.save_revision("x", "hi", [], source: "human")
     assert {:ok, %{item_id: "x", source: :saved, cleaned_text: "hi"}} = Inference.clean("x", "hi")
   end
 
@@ -97,7 +97,7 @@ defmodule Alambic.InferenceTest do
 
   test "clean/2 falls back to content-hash lookup when item_id has no row" do
     {:ok, _, :inserted} =
-      Cleanings.save_revision("labeled", "drop me keep me", [[0, 8]])
+      Cleanings.save_revision("labeled", "drop me keep me", [[0, 8]], source: "human")
 
     assert {:ok,
             %{
@@ -117,21 +117,21 @@ defmodule Alambic.InferenceTest do
     decomposed = <<"cafe", 0xCC, 0x81, " drop">>
     refute composed == decomposed
 
-    {:ok, _, :inserted} = Cleanings.save_revision("labeled", composed, [[5, 9]])
+    {:ok, _, :inserted} = Cleanings.save_revision("labeled", composed, [[5, 9]], source: "human")
 
     assert {:ok, %{source: :saved_by_content}} =
              Inference.clean("fresh", decomposed)
   end
 
   test "clean/2 falls through to model when neither item_id nor content matches" do
-    {:ok, _, :inserted} = Cleanings.save_revision("labeled", "different text", [])
+    {:ok, _, :inserted} = Cleanings.save_revision("labeled", "different text", [], source: "human")
     seed_active_model(:cleaning, "cleaning-dummy.1", "scripts/clean")
 
     assert {:ok, %{source: :model}} = Inference.clean("fresh", "totally unrelated")
   end
 
   test "clean/2 falls through to model when the saved row's blob is missing" do
-    {:ok, rev, :inserted} = Cleanings.save_revision("orphan", "abc", [])
+    {:ok, rev, :inserted} = Cleanings.save_revision("orphan", "abc", [], source: "human")
     :ok = Alambic.BlobStore.delete(rev.content_sha256)
     seed_active_model(:cleaning, "cleaning-dummy.1", "scripts/clean")
 
