@@ -59,3 +59,7 @@ docker-build:
 # Seed dummy models so /api/extract and /api/clean aren't 503 on a fresh DB
 db-seed:
     mix run priv/repo/seeds.exs
+
+# Enqueue the last N article ids into the prod cleaning review queue (default 100)
+enqueue-cleaning count="100":
+    ./scripts/enqueue-cleaning-review.sh {{count}}
