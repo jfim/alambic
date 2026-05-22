@@ -30,21 +30,31 @@ defmodule Alambic.Inference do
   def clean(item_id, text) do
     case Cleanings.latest(item_id) do
       %{content_sha256: sha, discard_ranges: ranges} ->
-        {:ok, source} = Alambic.BlobStore.get(sha)
-        cleaned = Cleanings.apply_discard_ranges(source, ranges)
-
-        {:ok,
-         %{
-           item_id: item_id,
-           cleaned_text: cleaned,
-           source: :saved,
-           model_version: nil,
-           confidence: nil
-         }}
+        respond_with_saved(item_id, sha, ranges, :saved)
 
       nil ->
-        run_model(:cleaning, item_id, text, &decode_clean/1)
+        case Cleanings.find_latest_by_text(text) do
+          %{content_sha256: sha, discard_ranges: ranges} ->
+            respond_with_saved(item_id, sha, ranges, :saved_by_content)
+
+          nil ->
+            run_model(:cleaning, item_id, text, &decode_clean/1)
+        end
     end
+  end
+
+  defp respond_with_saved(item_id, sha, ranges, source) do
+    {:ok, blob} = Alambic.BlobStore.get(sha)
+    cleaned = Cleanings.apply_discard_ranges(blob, ranges)
+
+    {:ok,
+     %{
+       item_id: item_id,
+       cleaned_text: cleaned,
+       source: source,
+       model_version: nil,
+       confidence: nil
+     }}
   end
 
   defp run_model(stage, item_id, input, decoder) do

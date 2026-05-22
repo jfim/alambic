@@ -94,4 +94,39 @@ defmodule Alambic.InferenceTest do
     seed_active_model(:cleaning, "cleaning-dummy.1", "scripts/clean")
     assert {:ok, %{cleaned_text: "foo", source: :model}} = Inference.clean("x", "ignored")
   end
+
+  test "clean/2 falls back to content-hash lookup when item_id has no row" do
+    {:ok, _, :inserted} =
+      Cleanings.save_revision("labeled", "drop me keep me", [[0, 8]])
+
+    assert {:ok,
+            %{
+              item_id: "fresh",
+              cleaned_text: "keep me",
+              source: :saved_by_content,
+              model_version: nil,
+              confidence: nil
+            }} = Inference.clean("fresh", "drop me keep me")
+  end
+
+  test "clean/2 content-hash lookup is NFC-aware" do
+    # Composed é (U+00E9, UTF-8: C3 A9) vs decomposed e + U+0301 (combining
+    # acute, UTF-8: 65 CC 81). Construct from bytes so the source-file
+    # editor / Elixir compiler can't normalize them away.
+    composed = <<"caf", 0xC3, 0xA9, " drop">>
+    decomposed = <<"cafe", 0xCC, 0x81, " drop">>
+    refute composed == decomposed
+
+    {:ok, _, :inserted} = Cleanings.save_revision("labeled", composed, [[5, 9]])
+
+    assert {:ok, %{source: :saved_by_content}} =
+             Inference.clean("fresh", decomposed)
+  end
+
+  test "clean/2 falls through to model when neither item_id nor content matches" do
+    {:ok, _, :inserted} = Cleanings.save_revision("labeled", "different text", [])
+    seed_active_model(:cleaning, "cleaning-dummy.1", "scripts/clean")
+
+    assert {:ok, %{source: :model}} = Inference.clean("fresh", "totally unrelated")
+  end
 end

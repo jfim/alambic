@@ -40,6 +40,36 @@ defmodule Alambic.Cleanings do
   end
 
   @doc """
+  Returns the most recently created revision whose `content_sha256` matches
+  the given hash, or `nil` if none exists. Searches across all items — used
+  by inference to apply existing labels to duplicate content under a new
+  `item_id` without invoking the model.
+  """
+  def find_latest_by_content_sha(sha) when is_binary(sha) do
+    from(r in Revision,
+      where: r.content_sha256 == ^sha,
+      order_by: [desc: r.created_at, desc: r.revision_id],
+      limit: 1
+    )
+    |> Repo.one()
+  end
+
+  @doc """
+  NFC-normalizes `text`, then looks up `find_latest_by_content_sha/1` against
+  its hash. Returns `nil` for invalid UTF-8 or when nothing matches.
+  """
+  def find_latest_by_text(text) when is_binary(text) do
+    case :unicode.characters_to_nfc_binary(text) do
+      normalized when is_binary(normalized) ->
+        sha = :crypto.hash(:sha256, normalized) |> Base.encode16(case: :lower)
+        find_latest_by_content_sha(sha)
+
+      {:error, _, _} ->
+        nil
+    end
+  end
+
+  @doc """
   Returns all *latest* revisions across items (one row per item). Used by the
   dataset export.
   """
