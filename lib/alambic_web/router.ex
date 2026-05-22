@@ -21,6 +21,7 @@ defmodule AlambicWeb.Router do
     live "/queue", QueueLive, :index
     live "/edit-extraction/:item_id", EditExtractionLive, :show
     live "/edit-cleaning/:item_id", EditCleaningLive, :show
+    get "/annotate-cleaning", AnnotateCleaningController, :next
   end
 
   scope "/api", AlambicWeb do
