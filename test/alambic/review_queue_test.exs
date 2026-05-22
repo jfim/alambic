@@ -34,4 +34,22 @@ defmodule Alambic.ReviewQueueTest do
     {:ok, _} = ReviewQueue.enqueue(%{attrs | confidence: 0.5})
     assert [%Entry{confidence: 0.5}] = ReviewQueue.list_pending()
   end
+
+  test "enqueue/1 preserves resolved_at on conflict" do
+    attrs = %{item_id: "r", stage: :extraction, confidence: 0.3, model_version: "v1"}
+    {:ok, _} = ReviewQueue.enqueue(attrs)
+    :ok = ReviewQueue.resolve("r", :extraction)
+    assert ReviewQueue.list_pending() == []
+
+    {:ok, _} = ReviewQueue.enqueue(%{attrs | confidence: 0.1, model_version: "v2"})
+
+    # Row is refreshed with the new model's confidence/version, but the human's
+    # resolution sticks — it stays out of the pending list.
+    assert ReviewQueue.list_pending() == []
+
+    row = Alambic.Repo.get_by!(Entry, item_id: "r", stage: :extraction)
+    assert row.confidence == 0.1
+    assert row.model_version == "v2"
+    refute is_nil(row.resolved_at)
+  end
 end
