@@ -13,6 +13,7 @@ defmodule Alambic.Cleanings do
   alias Alambic.BlobStore
   alias Alambic.Cleanings.Revision
   alias Alambic.Repo
+  alias Alambic.ReviewQueue.Entry
 
   import Ecto.Query
 
@@ -145,6 +146,25 @@ defmodule Alambic.Cleanings do
       {:ok, v} -> Map.put(map, key, v)
       :error -> map
     end
+  end
+
+  @doc """
+  Returns the highest-priority pending cleaning-stage review queue entry whose
+  item has no revision yet, or `nil` if none. Ordering matches
+  `ReviewQueue.list_pending/0` (ascending confidence, then queued_at).
+  """
+  def next_for_annotation do
+    from(e in Entry,
+      where: e.stage == :cleaning and is_nil(e.resolved_at),
+      where:
+        fragment(
+          "NOT EXISTS (SELECT 1 FROM cleaning_revisions r WHERE r.item_id = ?)",
+          e.item_id
+        ),
+      order_by: [asc: e.confidence, asc: e.queued_at],
+      limit: 1
+    )
+    |> Repo.one()
   end
 
   @doc """

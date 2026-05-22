@@ -125,4 +125,74 @@ defmodule Alambic.CleaningsTest do
     cs3 = Alambic.Cleanings.Revision.changeset(%Alambic.Cleanings.Revision{}, Map.put(base, :source, "human"))
     assert cs3.valid?
   end
+
+  describe "next_for_annotation/0" do
+    alias Alambic.ReviewQueue
+
+    test "returns nil when the cleaning queue is empty" do
+      assert Cleanings.next_for_annotation() == nil
+    end
+
+    test "returns the lowest-confidence pending cleaning entry with no revision" do
+      for {id, c} <- [{"a", 0.9}, {"b", 0.1}, {"c", 0.5}] do
+        {:ok, _} =
+          ReviewQueue.enqueue(%{
+            item_id: id,
+            stage: :cleaning,
+            confidence: c,
+            model_version: "v1"
+          })
+      end
+
+      assert %{item_id: "b"} = Cleanings.next_for_annotation()
+    end
+
+    test "skips items that already have a revision" do
+      {:ok, _} =
+        ReviewQueue.enqueue(%{
+          item_id: "already-done",
+          stage: :cleaning,
+          confidence: 0.05,
+          model_version: "v1"
+        })
+
+      {:ok, _} =
+        ReviewQueue.enqueue(%{
+          item_id: "todo",
+          stage: :cleaning,
+          confidence: 0.5,
+          model_version: "v1"
+        })
+
+      {:ok, _, :inserted} =
+        Cleanings.save_revision("already-done", "x", [], source: "human")
+
+      assert %{item_id: "todo"} = Cleanings.next_for_annotation()
+    end
+
+    test "ignores extraction-stage queue entries" do
+      {:ok, _} =
+        ReviewQueue.enqueue(%{
+          item_id: "x",
+          stage: :extraction,
+          confidence: 0.1,
+          model_version: "v1"
+        })
+
+      assert Cleanings.next_for_annotation() == nil
+    end
+
+    test "ignores already-resolved queue entries" do
+      {:ok, _} =
+        ReviewQueue.enqueue(%{
+          item_id: "r",
+          stage: :cleaning,
+          confidence: 0.1,
+          model_version: "v1"
+        })
+
+      :ok = ReviewQueue.resolve("r", :cleaning)
+      assert Cleanings.next_for_annotation() == nil
+    end
+  end
 end
