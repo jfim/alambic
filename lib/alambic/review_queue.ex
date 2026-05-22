@@ -10,7 +10,7 @@ defmodule Alambic.ReviewQueue do
     %Entry{}
     |> Entry.changeset(attrs)
     |> Repo.insert(
-      on_conflict: {:replace, [:confidence, :model_version, :queued_at, :resolved_at]},
+      on_conflict: {:replace, [:confidence, :model_version, :queued_at]},
       conflict_target: [:item_id, :stage]
     )
   end
