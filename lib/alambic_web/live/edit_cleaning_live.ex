@@ -4,8 +4,20 @@ defmodule AlambicWeb.EditCleaningLive do
   alias Alambic.{BlobStore, Cham, Cleanings, ReviewQueue}
   alias Alambic.Cleanings.Ranges
 
-  def mount(%{"item_id" => item_id}, _session, socket) do
+  def mount(%{"item_id" => item_id} = params, _session, socket) do
+    after_action = parse_after(params)
+
     case Cham.fetch_cleaning_content(item_id) do
+      {:error, {:status, 404}} when after_action == :annotate ->
+        # Item is gone from cham — there's nothing to label. Resolve the queue
+        # row so it stops showing up and walk to the next pending item.
+        :ok = ReviewQueue.resolve(item_id, :cleaning)
+
+        {:ok,
+         socket
+         |> put_flash(:info, "Skipped #{item_id} — content not found (404).")
+         |> push_navigate(to: ~p"/annotate-cleaning")}
+
       {:ok, raw} ->
         text = normalize(raw)
         sha = sha256(text)
@@ -49,13 +61,14 @@ defmodule AlambicWeb.EditCleaningLive do
   end
 
   def handle_params(params, _uri, socket) do
-    after_action =
-      case Map.get(params, "after") do
-        "annotate" -> :annotate
-        _ -> nil
-      end
+    {:noreply, assign(socket, after_action: parse_after(params))}
+  end
 
-    {:noreply, assign(socket, after_action: after_action)}
+  defp parse_after(params) do
+    case Map.get(params, "after") do
+      "annotate" -> :annotate
+      _ -> nil
+    end
   end
 
   defp initial_ranges(nil, _sha), do: {[], false}
