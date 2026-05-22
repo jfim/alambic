@@ -91,4 +91,24 @@ defmodule Alambic.CleaningsTest do
     assert :not_found = BlobStore.get(r1.content_sha256)
     assert :not_found = BlobStore.get(r2.content_sha256)
   end
+
+  test "Revision changeset requires source and rejects unknown values" do
+    base = %{
+      item_id: "x",
+      revision_id: 1,
+      content_sha256: String.duplicate("a", 64),
+      discard_ranges: []
+    }
+
+    cs = Alambic.Cleanings.Revision.changeset(%Alambic.Cleanings.Revision{}, base)
+    refute cs.valid?
+    assert {"can't be blank", _} = cs.errors[:source]
+
+    cs2 = Alambic.Cleanings.Revision.changeset(%Alambic.Cleanings.Revision{}, Map.put(base, :source, "bogus"))
+    refute cs2.valid?
+    assert cs2.errors[:source]
+
+    cs3 = Alambic.Cleanings.Revision.changeset(%Alambic.Cleanings.Revision{}, Map.put(base, :source, "human"))
+    assert cs3.valid?
+  end
 end

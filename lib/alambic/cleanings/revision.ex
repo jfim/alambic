@@ -2,6 +2,8 @@ defmodule Alambic.Cleanings.Revision do
   use Ecto.Schema
   import Ecto.Changeset
 
+  @sources ~w(human model llm_batch)
+
   @primary_key false
   schema "cleaning_revisions" do
     field :item_id, :string, primary_key: true
@@ -10,7 +12,10 @@ defmodule Alambic.Cleanings.Revision do
     field :discard_ranges, {:array, {:array, :integer}}, default: []
     field :created_at, :utc_datetime
     field :model_version, :string
+    field :source, :string
   end
+
+  def sources, do: @sources
 
   def changeset(revision, attrs) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
@@ -23,9 +28,11 @@ defmodule Alambic.Cleanings.Revision do
       :content_sha256,
       :discard_ranges,
       :created_at,
-      :model_version
+      :model_version,
+      :source
     ])
-    |> validate_required([:item_id, :revision_id, :content_sha256, :created_at])
+    |> validate_required([:item_id, :revision_id, :content_sha256, :created_at, :source])
+    |> validate_inclusion(:source, @sources)
     |> validate_format(:content_sha256, ~r/\A[a-f0-9]{64}\z/)
     |> validate_change(:discard_ranges, &validate_ranges/2)
   end
