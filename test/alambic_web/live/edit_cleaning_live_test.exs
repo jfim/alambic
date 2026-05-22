@@ -9,14 +9,14 @@ defmodule AlambicWeb.EditCleaningLiveTest do
   setup :verify_on_exit!
 
   test "renders fetched HTML and a placeholder annotation pane", %{conn: conn} do
-    stub(Alambic.ChamMock, :fetch_html, fn _ -> {:ok, "<html/>"} end)
+    stub(Alambic.ChamMock, :fetch_extraction_html, fn _ -> {:ok, "<html/>"} end)
 
     {:ok, _view, html} = live(conn, ~p"/edit-cleaning/abc")
     assert html =~ "Token annotation"
   end
 
   test "confirm writes a cleaning and resolves the queue", %{conn: conn} do
-    stub(Alambic.ChamMock, :fetch_html, fn _ -> {:ok, "<html/>"} end)
+    stub(Alambic.ChamMock, :fetch_extraction_html, fn _ -> {:ok, "<html/>"} end)
 
     {:ok, _} =
       ReviewQueue.enqueue(%{

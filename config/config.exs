@@ -64,7 +64,7 @@ config :phoenix, :json_library, Jason
 config :alambic,
   cham_impl: Alambic.Cham.HTTP,
   cham_base_url: "http://localhost:4001",
-  cham_raw_html_filename: "original.html",
+  cham_extraction_html_filename: "original.html",
   review_confidence_threshold: 0.7,
   scripts_path: "scripts"
 
