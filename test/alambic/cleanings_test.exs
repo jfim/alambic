@@ -18,7 +18,7 @@ defmodule Alambic.CleaningsTest do
 
   test "save_revision inserts the first revision as #1" do
     {:ok, %Revision{revision_id: 1} = rev, :inserted} =
-      Cleanings.save_revision("item-a", "hello world", [[0, 5]])
+      Cleanings.save_revision("item-a", "hello world", [[0, 5]], source: "human")
 
     assert rev.discard_ranges == [[0, 5]]
     assert {:ok, "hello world"} = BlobStore.get(rev.content_sha256)
@@ -26,31 +26,31 @@ defmodule Alambic.CleaningsTest do
 
   test "save_revision dedups identical (content_sha256, discard_ranges)" do
     {:ok, %Revision{revision_id: 1}, :inserted} =
-      Cleanings.save_revision("item-b", "same text", [[0, 4]])
+      Cleanings.save_revision("item-b", "same text", [[0, 4]], source: "human")
 
     {:ok, %Revision{revision_id: 1}, :unchanged} =
-      Cleanings.save_revision("item-b", "same text", [[0, 4]])
+      Cleanings.save_revision("item-b", "same text", [[0, 4]], source: "human")
 
     assert length(Cleanings.history("item-b")) == 1
   end
 
   test "save_revision allocates the next revision_id on a change" do
     {:ok, %Revision{revision_id: 1}, :inserted} =
-      Cleanings.save_revision("item-c", "text one", [])
+      Cleanings.save_revision("item-c", "text one", [], source: "human")
 
     {:ok, %Revision{revision_id: 2}, :inserted} =
-      Cleanings.save_revision("item-c", "text one", [[0, 4]])
+      Cleanings.save_revision("item-c", "text one", [[0, 4]], source: "human")
 
     {:ok, %Revision{revision_id: 3}, :inserted} =
-      Cleanings.save_revision("item-c", "text two", [[0, 4]])
+      Cleanings.save_revision("item-c", "text two", [[0, 4]], source: "human")
 
     history = Cleanings.history("item-c")
     assert Enum.map(history, & &1.revision_id) == [1, 2, 3]
   end
 
   test "latest returns the highest revision_id for the item" do
-    {:ok, _, :inserted} = Cleanings.save_revision("item-d", "first", [])
-    {:ok, _, :inserted} = Cleanings.save_revision("item-d", "second", [])
+    {:ok, _, :inserted} = Cleanings.save_revision("item-d", "first", [], source: "human")
+    {:ok, _, :inserted} = Cleanings.save_revision("item-d", "second", [], source: "human")
 
     assert %Revision{revision_id: 2} = Cleanings.latest("item-d")
   end
@@ -64,17 +64,17 @@ defmodule Alambic.CleaningsTest do
     decomposed = "café"
 
     {:ok, %Revision{content_sha256: sha1}, :inserted} =
-      Cleanings.save_revision("item-e", composed, [])
+      Cleanings.save_revision("item-e", composed, [], source: "human")
 
     {:ok, %Revision{content_sha256: sha2}, _} =
-      Cleanings.save_revision("item-e", decomposed, [])
+      Cleanings.save_revision("item-e", decomposed, [], source: "human")
 
     assert sha1 == sha2
   end
 
   test "save_revision rejects invalid UTF-8" do
     assert {:error, :invalid_utf8} =
-             Cleanings.save_revision("item-f", <<0xFF, 0xFE, 0xFD>>, [])
+             Cleanings.save_revision("item-f", <<0xFF, 0xFE, 0xFD>>, [], source: "human")
   end
 
   test "apply_discard_ranges slices by codepoint" do
@@ -82,14 +82,28 @@ defmodule Alambic.CleaningsTest do
   end
 
   test "delete_all removes all revisions and their blobs" do
-    {:ok, r1, :inserted} = Cleanings.save_revision("item-g", "alpha", [])
-    {:ok, r2, :inserted} = Cleanings.save_revision("item-g", "beta", [])
+    {:ok, r1, :inserted} = Cleanings.save_revision("item-g", "alpha", [], source: "human")
+    {:ok, r2, :inserted} = Cleanings.save_revision("item-g", "beta", [], source: "human")
 
     :ok = Cleanings.delete_all("item-g")
 
     assert Cleanings.history("item-g") == []
     assert :not_found = BlobStore.get(r1.content_sha256)
     assert :not_found = BlobStore.get(r2.content_sha256)
+  end
+
+  test "save_revision/4 requires a :source opt" do
+    assert_raise KeyError, fn ->
+      Cleanings.save_revision("item-src", "hello", [], [])
+    end
+  end
+
+  test "save_revision/4 persists the source value" do
+    {:ok, %Revision{source: "human"}, :inserted} =
+      Cleanings.save_revision("item-src-h", "hi", [], source: "human")
+
+    {:ok, %Revision{source: "llm_batch"}, :inserted} =
+      Cleanings.save_revision("item-src-l", "hi", [], source: "llm_batch")
   end
 
   test "Revision changeset requires source and rejects unknown values" do

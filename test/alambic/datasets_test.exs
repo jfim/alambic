@@ -35,7 +35,7 @@ defmodule Alambic.DatasetsTest do
 
   test "cleaning parquet carries discard_ranges as list of lists" do
     {:ok, _, :inserted} =
-      Cleanings.save_revision("c1", "abcdefghij", [[0, 3], [7, 10]])
+      Cleanings.save_revision("c1", "abcdefghij", [[0, 3], [7, 10]], source: "human")
 
     bytes = Datasets.export_parquet(:cleaning) |> IO.iodata_to_binary()
     path = Path.join(System.tmp_dir!(), "alambic_t_#{System.unique_integer([:positive])}.parquet")
@@ -49,8 +49,8 @@ defmodule Alambic.DatasetsTest do
   end
 
   test "cleaning parquet exports only the latest revision per item" do
-    {:ok, _, :inserted} = Cleanings.save_revision("c2", "first text", [[0, 3]])
-    {:ok, _, :inserted} = Cleanings.save_revision("c2", "second text", [[1, 4]])
+    {:ok, _, :inserted} = Cleanings.save_revision("c2", "first text", [[0, 3]], source: "human")
+    {:ok, _, :inserted} = Cleanings.save_revision("c2", "second text", [[1, 4]], source: "human")
 
     bytes = Datasets.export_parquet(:cleaning) |> IO.iodata_to_binary()
     path = Path.join(System.tmp_dir!(), "alambic_t_#{System.unique_integer([:positive])}.parquet")

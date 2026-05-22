@@ -80,7 +80,7 @@ defmodule AlambicWeb.EditCleaningLive do
   def handle_event("save", _params, socket) do
     %{item_id: item_id, text: text, ranges: ranges} = socket.assigns
 
-    case Cleanings.save_revision(item_id, text, ranges) do
+    case Cleanings.save_revision(item_id, text, ranges, source: "human") do
       {:ok, _row, status} ->
         :ok = ReviewQueue.resolve(item_id, :cleaning)
         flash = if status == :unchanged, do: "Saved — no changes.", else: "Saved."

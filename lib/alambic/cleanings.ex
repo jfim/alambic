@@ -91,17 +91,20 @@ defmodule Alambic.Cleanings do
   NFC-normalizes `text`, stores it in the blob store, and inserts a new
   revision row unless it would be a no-op duplicate of the latest revision.
 
-  `opts` may carry `:model_version` and `:created_at`.
+  Required: `opts[:source]` — one of `"human"`, `"model"`, `"llm_batch"`.
+  Optional: `opts[:model_version]`, `opts[:created_at]`.
 
   Returns `{:ok, %Revision{}, :inserted | :unchanged}` on success or
   `{:error, :invalid_utf8}` if the text is not valid UTF-8.
   """
-  def save_revision(item_id, text, discard_ranges, opts \\ [])
+  def save_revision(item_id, text, discard_ranges, opts)
       when is_binary(item_id) and is_binary(text) and is_list(discard_ranges) do
+    source = Keyword.fetch!(opts, :source)
+
     case :unicode.characters_to_nfc_binary(text) do
       normalized when is_binary(normalized) ->
         {:ok, sha} = BlobStore.put(normalized)
-        do_save(item_id, sha, discard_ranges, opts)
+        do_save(item_id, sha, discard_ranges, Keyword.put(opts, :source, source))
 
       {:error, _, _} ->
         {:error, :invalid_utf8}
@@ -121,7 +124,8 @@ defmodule Alambic.Cleanings do
             item_id: item_id,
             revision_id: next_id,
             content_sha256: sha,
-            discard_ranges: ranges
+            discard_ranges: ranges,
+            source: Keyword.fetch!(opts, :source)
           }
           |> maybe_put(opts, :model_version)
           |> maybe_put(opts, :created_at)
